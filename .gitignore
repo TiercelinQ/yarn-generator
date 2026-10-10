@@ -1,0 +1,38 @@
+# Local Claude Code settings - personal, never committed
+.claude/settings.local.json
+
+# Claude Code auto memory - personal, never committed
+.claude/agent-memory/
+
+# Generated project artifacts - a test project scaffolded here during generation testing
+node_modules/
+dist/
+
+# Yarn Berry (no zero-install: .yarn/cache is not committed)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Local work plan
+tasks/
+
+# Project runtime data - never commit env, logs, or exports
+.env
+logs/
+*.log
+exports/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
