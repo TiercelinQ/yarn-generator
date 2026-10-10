@@ -2,7 +2,7 @@
 
 > Claude Code generator for **TypeScript projects on Node.js and Yarn Berry**, for five use cases: CLI tool, library, service, extension, application (with UI). **Salesforce** coupling (`sf` v2 CLI) is optional and detected in Phase 1.
 
-Part of a family of Claude Code generators. See also [dotnet-wpf-app-generator](https://github.com/TiercelinQ/dotnet-wpf-app-generator), [electron-app-generator](https://github.com/TiercelinQ/electron-app-generator), [flutter-app-generator](https://github.com/TiercelinQ/flutter-app-generator), [python-app-generator](https://github.com/TiercelinQ/python-app-generator), and [vscode-ext-generator](https://github.com/TiercelinQ/vscode-ext-generator). Where those generate one fixed kind of app, `yarn` generates the TypeScript project of your choice (headless tool, package, long-running process, host extension, web UI) on a single package manager: Yarn Berry.
+Part of a family of Claude Code generators. See also [dotnet-wpf-app-generator](https://github.com/TiercelinQ/dotnet-wpf-app-generator), [electron-app-generator](https://github.com/TiercelinQ/electron-app-generator), [flutter-app-generator](https://github.com/TiercelinQ/flutter-app-generator), [local-webapp-generator](https://github.com/TiercelinQ/local-webapp-generator), [python-app-generator](https://github.com/TiercelinQ/python-app-generator), [sf-node-generator](https://github.com/TiercelinQ/sf-node-generator), and [vscode-ext-generator](https://github.com/TiercelinQ/vscode-ext-generator). Where those generate one fixed kind of app, `yarn` generates the TypeScript project of your choice (headless tool, package, long-running process, host extension, web UI) on a single package manager: Yarn Berry.
 
 Unified edition: the full generation pipeline **plus** post-delivery maintenance skills, an explicit role per skill, persisted specs, centralized executable verification, and native memory.
 
@@ -222,8 +222,10 @@ Every install, script, and release command goes through `yarn` (`yarn install`, 
 | [electron-app-generator](https://github.com/TiercelinQ/electron-app-generator) | Node.js · Electron · React · TS | Windows desktop |
 | [dotnet-wpf-app-generator](https://github.com/TiercelinQ/dotnet-wpf-app-generator) | .NET 10 · C# · WPF · MVVM | Windows desktop |
 | [flutter-app-generator](https://github.com/TiercelinQ/flutter-app-generator) | Flutter · Dart · Riverpod | Android |
-| [yarn-generator](https://github.com/TiercelinQ/yarn-generator) | Node.js · TypeScript · Yarn Berry (optional Salesforce CLI) | CLI · library · service · extension · application |
+| [sf-node-generator](https://github.com/TiercelinQ/sf-node-generator) | Node.js · TypeScript · Salesforce CLI | Headless CLI |
 | [vscode-ext-generator](https://github.com/TiercelinQ/vscode-ext-generator) | TypeScript · esbuild · native theming | VS Code extension |
+| [local-webapp-generator](https://github.com/TiercelinQ/local-webapp-generator) | Node.js · Express · TS | Local web app |
+| [yarn-generator](https://github.com/TiercelinQ/yarn-generator) | Node.js · TypeScript · Yarn Berry (optional Salesforce CLI) | CLI · library · service · extension · application |
 
 ---
 
