@@ -33,7 +33,7 @@ import type { LevelWithSilent } from "pino";
 import pkg from "../package.json" with { type: "json" }; // single source for APP_VERSION (see "Version - single source" below)
 
 // --- Static identity (not part of the runtime cascade) ----------------------
-export const APP_NAME = "mytool";        // project name - the `bin` (CLI), the log context, the [TOOL]_DEBUG var (@rules/logging.md)
+export const APP_NAME = "mytool";        // project name - the `bin` (CLI), the log context, the [PROJECT]_DEBUG var (@rules/logging.md)
 export const APP_VERSION = pkg.version;  // derived from package.json (single source) - surfaced by `--version` (@rules/cli.md)
 export const COUPLING_MODE: "standalone" | "sfdx-project" = "standalone"; // SALESFORCE ONLY - fixed in Phase 1 - @rules/sfdx-project.md
 
@@ -254,21 +254,21 @@ dist
   - **CLI**: `"bin"` maps the tool name to the built `dist/cli.js` (shebang added by tsup); `dev` is `tsx src/cli.ts`. Locally the tool runs with `yarn dev` or `node dist/cli.js`. `yarn link` is run from **another** (consumer) project: it adds a `resolutions` entry there and installs no global command (`yarn-link.md`). Publication: `@rules/distribution.md`.
   - **Library**: no `bin`; add `"main"`, `"types"` and an `"exports"` map pointing at `dist/index.js` and `dist/index.d.ts` (tsup `dts: true`); `dev` is a watch build or a `tsx` example script. The exports map is the public API contract (`@rules/versioning.md`).
   - **Service**: no `bin`/`files`; `dev` is `tsx src/server.ts`, the start script runs `node dist/server.js`. Distribution is personal by default (local run); an external target is an opt-in recorded in Phase 1 (`@rules/distribution.md`).
-  - **Extension** (when host = VS Code, chosen in Phase 1): the `package.json` manifest carries `engines.vscode`, `main`, `contributes` and `activationEvents`; the detailed manifest rules belong to the dedicated `vscode` generator framework (`@rules/use-cases.md`). Another host follows the same boundary with its own manifest or activation contract, taken from what the user stated in Phase 1.
+  - **Extension** (when host = VS Code, chosen in Phase 1): the `package.json` manifest carries `engines.vscode`, `main: ./dist/extension.cjs`, `contributes` and `activationEvents`; the detailed manifest rules belong to the dedicated `vscode` generator framework (`@rules/use-cases.md`). Another host follows the same boundary with its own manifest or activation contract, taken from what the user stated in Phase 1.
   - **Application**: `dev` is `vite`, `build` is `vite build` (plus `tsc --noEmit` in `typecheck`); no `bin`.
 - **`"files": ["dist"]`** - only if publishing to the npm registry (whitelist the built output; `yarn pack` builds the tarball, `yarn-pack.md`). Omit for a private/internal project.
 - **`"test"`** is present only when tests were enabled in Phase 1 (`@rules/tests.md`); otherwise drop the script.
 - `dev` runs the TS entry directly with `tsx` (no build step); `.env` is loaded programmatically by the composition root (above), so dev and the built output behave the same.
 
-## `tsup.config.ts` (CLI, library, service, extension)
+## `tsup.config.ts` (CLI, library, service; extension: see its own target below)
 
 ```ts
 // tsup.config.ts
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/cli.ts"],                 // CLI. Library: src/index.ts · service: src/server.ts · extension: src/extension.ts
-  format: ["esm"],                       // "type": "module" - ESM only
+  entry: ["src/cli.ts"],                 // CLI. Library: src/index.ts · service: src/server.ts (extension: separate target below)
+  format: ["esm"],                       // "type": "module" - ESM only (CLI, library, service)
   target: "node24",                      // match the Node LTS line (see dependency table)
   platform: "node",
   clean: true,                           // wipe dist/ before each build
@@ -281,7 +281,26 @@ export default defineConfig({
 - One entry -> one output file in `dist/`. **tsup externalizes `dependencies` / `peerDependencies` by default** (they resolve from `node_modules` at runtime) and bundles only your `src/` (+ any imported `devDependency`). So every runtime-imported package (pino, pino-pretty, commander, cross-spawn, and exceljs / csv-stringify when shipped) must be a `dependency`. For **local** and **npm-package** distribution `node_modules` is present at runtime, so external deps are correct. The **bundled single-file exe** mode (Phase 1) is a separate advanced build (bundle deps in, or Node SEA / `@vercel/ncc`) and must special-case `pino`/`pino-pretty`, which resist ESM bundling.
 - **Library**: entry `src/index.ts`, no shebang banner, set **`dts: true`** to emit declarations. **Lib+bins mode** (a CLI that also exposes a programmatic API): `entry: ["src/cli.ts", "src/index.ts"]` and `dts: true`.
 - **Service**: no shebang banner; the entry is `src/server.ts`.
-- **Extension**: entry `src/extension.ts`; when host = VS Code, `vscode` is provided by the host at run time and stays external, and the other bundle options come from the dedicated `vscode` generator framework. Another host follows the same boundary: its host-provided modules stay external, and its bundle options come from what the user stated in Phase 1.
+- **Extension**: a separate tsup target, because a host loads the extension with `require` and the packaged artifact ships **no `node_modules`**. When host = VS Code: CommonJS output, `vscode` external (provided by the host), every other dependency **embedded**, target aligned with the `engines.vscode` floor (the same values as the dedicated `vscode` generator framework: `format: "cjs"`, `platform: "node"`, `target` matching the Node line of the floor, `external: ["vscode"]`). The project keeps `"type": "module"`, so the CommonJS file carries the `.cjs` extension (`dist/extension.cjs`, `main: ./dist/extension.cjs`): a `.js` CommonJS file would be read as ESM by Node under `"type": "module"`.
+
+  ```ts
+  // tsup.config.ts - extension target (host = VS Code)
+  import { defineConfig } from "tsup";
+
+  export default defineConfig({
+    entry: ["src/extension.ts"],
+    format: ["cjs"],
+    platform: "node",
+    target: "node20",                    // illustrative: derive it from engines.vscode, never from the dev machine
+    external: ["vscode"],                // provided by the host
+    noExternal: [/.*/],                 // embed every other dependency: the .vsix has no node_modules
+    outExtension: () => ({ js: ".cjs" }),
+    sourcemap: true,                     // exclude *.map from the packaged artifact
+    clean: true,
+  });
+  ```
+
+  `noExternal` is the opposite of the default **externalization** described above: for the extension, runtime packages need not be `dependencies` (they are embedded), but keep them in `dependencies` anyway so the import graph stays honest and `yarn npm audit` sees them. Another host follows the same boundary: its host-provided modules stay external, and its **module format**, externals and bundle options come from what the user stated in Phase 1 (`@rules/use-cases.md`); invent nothing.
 - **Application**: not built by tsup, see the Vite section below.
 
 ## `tsconfig.json`
@@ -387,14 +406,14 @@ Versioning notes:
 - **`typescript ^6.0.3` + `typescript-eslint ^8.71.1`**: typescript-eslint 8's TypeScript peer range is `>=4.8.4 <6.1.0`. **TypeScript 6.0.x shipped stable** (`6.0.2`, `6.0.3`), so pin `^6.0.3` - it resolves to the highest 6.0.x, inside that range. Caveat: the registry `latest` tag is now **7.x** (`7.0.2`, the native/Go-port line), which typescript-eslint 8 does **not** support (peer `<6.1.0`), so a bare `yarn add typescript` would pull an unsupported 7.x - the `^6.0.3` pin is deliberate. Checked on the registry on 2026-10-10: `typescript` `latest` is `7.0.2` and `typescript-eslint 8.71.1` still declares `typescript >=4.8.4 <6.1.0`. Do **not** take `latest` / `^7.x` until a typescript-eslint major widens its peer range. Confirm at generation: `yarn npm info typescript` and `yarn npm info typescript-eslint --fields peerDependencies` (`yarn-npm-info.md`).
 - **`yarn up` ignores the manifest range**: `yarn up <package>` moves to the latest release (`yarn-up.md`), which would break the TypeScript pin above. Update `typescript` with an explicit target (`yarn up typescript@<6.0.x version>`).
 - **`eslint ^10.12.0`**: **flat config only** (`eslint.config.mjs`); its engines are `^20.19.0 || ^22.13.0 || >=24`. **`commander ^15.0.0`** needs **Node >= 22.12**. Both are satisfied by the Node 24 target.
-- **`vitest ^5.0.3`**: peers `vite ^6.4 || ^7 || ^8` and `@types/node ^22 || >=24`, engines `^22.12 || ^24 || >=26`, so it fits Node 24 and `vite ^8`. It is a major step above the `^4.1.x` line (last `4.1.11`) and the test patterns of `@rules/tests.md` are not yet validated on it: run the first `yarn test` as the check, and fall back to `^4.1.11` if a pattern breaks.
+- **`vitest ^5.0.3`**: peers `vite ^6.4 || ^7 || ^8` and `@types/node ^22 || >=24`, engines `^22.12 || ^24 || >=26`, so it fits Node 24 and `vite ^8`. It is a major step above the `^4.1.x` line (last `4.1.11`) and the test patterns of `@rules/tests.md` are not yet validated on it: run the first `yarn test` as the check, and fall back to `^4.1.11` if a pattern breaks (this fallback is the only allowed exception to the "never loosen or re-derive a range" rule).
 - **`jsdom ^30.1.2`** (projects with UI and tests): its engines are `^22.22.2 || ^24.15.0 || >=26`, stricter than `engines.node >=24`. For such a project set `engines.node` to `>=24.15` (or pin an older `jsdom`).
 - **`csv-stringify ^6.9.0`** (conditional: only when the `csv` format ships): the **standalone package from the `csv` project** (`csv-stringify`, not the umbrella `csv` bundle) - import `csv-stringify` / `csv-stringify/sync` for the sync API (`@rules/output.md`).
 - **`exceljs ^4.4.0`** (conditional: only when the `xlsx` format ships): the maintained **xlsx** choice. **Avoid SheetJS / `xlsx`** (supply-chain / security history) - do not substitute it (`@rules/output.md`).
 - **`pino ^10.4.0`** + **`pino-pretty ^13.2.0`** - **both runtime `dependencies`** (the mandatory logging pair for CLI and service, `@rules/logging.md`). `pino-pretty` is imported at module load by `src/logger.ts` (used whenever `NODE_ENV !== "production"`), so it must be a `dependency`, **not** a devDependency: **tsup externalizes `dependencies` but bundles `devDependencies`**, and a bundled `pino-pretty` throws `Dynamic require of "tty" is not supported` in the ESM output. Rule of thumb: every package imported by shipped `src/` goes in `dependencies`.
 - **`cross-spawn ^7.0.6`** (runtime) + **`@types/cross-spawn ^6.0.6`** (dev), **Salesforce only**: the only correct way to spawn `sf` cross-OS (`@rules/sf-cli.md`, `@rules/security.md`).
 
-> **Version maintenance**: this table and these notes reflect the registry state checked on 2026-10-10 (Yarn Classic `yarn info`, same registry as `yarn npm info`). Before pinning in a new project, re-confirm the current minors (`yarn upgrade-interactive` lists the outdated packages against the registry - `yarn-upgrade-interactive.md`; `yarn npm info <package>` for one package; the release notes) - they age. The caret rule and the structure stay; the numbers and notes are refreshed per project in Phase 1. Once refreshed and validated, the ranges are used **as written** when `package.json` is written (for example `eslint ^10.12.0`, never a loosened `^10`).
+> **Version maintenance**: this table and these notes reflect the registry state checked on 2026-10-10 (Yarn Classic `yarn info`, same registry as `yarn npm info`). Before pinning in a new project, re-confirm the current minors (`yarn upgrade-interactive` lists the outdated packages against the registry - `yarn-upgrade-interactive.md`; `yarn npm info <package>` for one package; the release notes) - they age. The caret rule and the structure stay; the numbers and notes are refreshed per project in Phase 1. Once refreshed and validated, the ranges are used **as written** when `package.json` is written (for example `eslint ^10.12.0`, never a loosened `^10`); the only exception is the documented `vitest ^4.1.11` fallback above.
 
 ## Anti-patterns - what NOT to do
 

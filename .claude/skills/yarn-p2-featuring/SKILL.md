@@ -88,9 +88,10 @@ Produce the sheet (in the user's language):
 - Output formats: [Phase 1 selection = the formats that ship, `json` + `table` always] (default `--format`: [value]) - CLI tool only
 - Tests: [Yes/No] - `vitest`
 - Interactivity: [Non-interactive | Interactive] - `@clack/prompts` if interactive - CLI tool only
-- UI choices: [Phase 1 selection] - application / extension webview only
+- Extension webview: [Yes | No] (Phase 1) - extension only
+- UI choices: [Phase 1 selection: styling approach, UI libraries] - application / extension webview only
 - Execution shape: [Phase 1]
-- Distribution: [Phase 1]
+- Distribution: [Phase 1; a library: npm registry, not asked]
 - Config strategy: [Phase 1]
 - Validated libraries: [Phase 1 list]
 

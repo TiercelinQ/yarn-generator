@@ -16,7 +16,7 @@ If disabled:
 
 ## Non-negotiable stack
 
-- `vitest ^5.0.3` (unit + integration; native mocking via `vi`) - no other test framework. Fallback `^4.1.11` if a pattern below breaks on 5 (see the `vitest` note in `@rules/config.md`). Re-confirm the current minor at generation, same maintenance note as `@rules/config.md`.
+- `vitest ^5.0.3` (unit + integration; native mocking via `vi`) - no other test framework. Fallback `^4.1.11` if a pattern below breaks on 5 (see the `vitest` note in `@rules/config.md`; it is the only allowed exception to the "validated ranges are used as written" rule). Re-confirm the current minor at generation, same maintenance note as `@rules/config.md`.
 - Default **`node`** test environment (vitest's default) for the **CLI, library, and service** use cases - no `@testing-library`, no `jsdom` (headless: there is no DOM to render). Never set `jsdom` for these use cases.
 
 `package.json` scripts: `"test": "vitest run"` (+ `"test:watch": "vitest"`). Run with `yarn test` / `yarn test:watch` (`yarn-berry-cli-reference/yarn-run.md`).

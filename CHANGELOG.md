@@ -4,6 +4,23 @@ All notable changes to this generator are documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 (This is the changelog of the **generator** itself, distinct from the `docs/release/CHANGELOG.md` of each generated project.)
 
+## [1.0.1] - 2026-10-26
+
+### Fixed
+- Distribution is a closed Phase 1 question for the CLI tool, service, extension and application; the stale "stated default" wording is removed from `yarn-p1-scoping`, `README.md` and `GUIDE.md`. A library is not asked: its channel is always the npm registry.
+- The provisional calibration announced at the end of Phase 1 (decision A-1) is now described as such in `GUIDE.md`.
+- `src/logger.ts` exists for the CLI tool and the service only. Library, extension and application use an injected `Logger` (`rules/logging.md`, `rules/errors.md`, `rules/architecture.md`, `rules/use-cases.md`, `rules/verification.md`).
+- Global `uncaughtException` / `unhandledRejection` handlers are mandatory in `cli.ts` and `server.ts` only; a library and an extension install none, the application installs `window` listeners in `main.tsx` (`rules/errors.md` and every rule, skill and doc that mentioned them).
+- The Phase 1 UI choices now name what `rules/ui.md` leaves to Phase 1 (styling approach, UI libraries); `yarn-p3-surfaces` no longer refers to a palette, a design system or i18n questions that `rules/ui.md` forbids.
+- `yarn npm audit --recursive` is written the same way in `rules/architecture.md`, `rules/security.md`, `rules/verification.md`, `rules/readme.md`, `yarn-p5-development` and the README template, as an advisory step outside the blocking verification chain.
+- The debug variable is `[PROJECT]_DEBUG` (was `[TOOL]_DEBUG`); "tool" becomes "project" in the use-case-neutral wording; the library error style is fixed in Phase 3, as `yarn-p3-surfaces` asks.
+
+### Changed
+- Extension (host = VS Code): the bundle is CommonJS `dist/extension.cjs` with every dependency embedded except `vscode` and a target aligned with `engines.vscode`; the project keeps `"type": "module"` (`rules/config.md`, `rules/use-cases.md`, `rules/distribution.md`, `rules/verification.md` bundle check). For another host, Phase 1 now asks the module format and the host-provided modules.
+- Phase 1 asks whether an extension has a webview (closed Yes/No question next to the host); `yarn-p3-surfaces` and `yarn-p4-architect` follow it.
+- `yarn-p4-architect` records the distribution and the release channel in the contract; `yarn-show-state` and `yarn-save-session` list host, UI choices, distribution and the calibration announcement.
+- The `vitest ^4.1.11` fallback is documented as the only exception to "never loosen a validated range".
+
 ## [1.0.0] - 2026-10-10
 
 ### Added

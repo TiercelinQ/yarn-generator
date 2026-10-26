@@ -98,7 +98,7 @@ try {
 }
 ```
 
-The sample keeps two global flags; a project declares every global flag of its `CliFlags` (`@rules/config.md`) once in `withGlobalOptions`, and `--page-size`-style numeric flags are coerced before `resolveConfig`. `debugEnabled` is the `[TOOL]_DEBUG` helper of `@rules/logging.md`.
+The sample keeps two global flags; a project declares every global flag of its `CliFlags` (`@rules/config.md`) once in `withGlobalOptions`, and `--page-size`-style numeric flags are coerced before `resolveConfig`. `debugEnabled` is the `[PROJECT]_DEBUG` helper of `@rules/logging.md`.
 
 When Salesforce is confirmed, the composition chain gains the `sf/` layer (runner → helpers → services):
 

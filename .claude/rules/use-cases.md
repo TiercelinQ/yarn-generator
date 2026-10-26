@@ -18,22 +18,22 @@ Comparison (same table as `CLAUDE.md`, kept here so this guide stands alone):
 
 | Use case    | Entry point        | Typical output                        | Release channel (see `@rules/distribution.md`) |
 | ----------- | ------------------ | ------------------------------------- | ---------------------------------------------- |
-| CLI tool    | `src/cli.ts`       | executable bin bundled by `tsup`      | npm registry, or local run of `dist/cli.js`    |
+| CLI tool    | `src/cli.ts`       | executable bin bundled by `tsup`      | local run of `dist/cli.js` (default), npm registry (opt-in) |
 | Library     | `src/index.ts`     | importable package (ESM, types)       | npm registry                                   |
-| Service     | `src/server.ts`    | long-running Node.js process          | run locally, or external target (opt-in)       |
-| Extension   | `src/extension.ts` | extension bundle for its host         | packaged artifact installed by hand, or the host's store (opt-in) |
-| Application | `src/main.tsx`     | web UI built by Vite (React)          | local build, or external target (opt-in)       |
+| Service     | `src/server.ts`    | long-running Node.js process          | run locally (default), or external target (opt-in) |
+| Extension   | `src/extension.ts` | extension bundle for its host         | packaged artifact installed by hand (default), or the host's store (opt-in) |
+| Application | `src/main.tsx`     | web UI built by Vite (React)          | local build (default), or external target (opt-in) |
 
 What changes and what does not:
 
-- **Common core** (all five): `src/`, `test/` mirroring `src/`, shared files `config.ts`, `types.ts`, `errors.ts`, plus `logger.ts` where the use case imposes it. Business logic lives in `src/services/` and returns `Result<T>` (`@rules/errors.md`).
+- **Common core** (all five): `src/`, `test/` mirroring `src/`, shared files `config.ts`, `types.ts`, `errors.ts`, plus `logger.ts` for a CLI tool and a service only (library, extension and application use an injected `Logger`). Business logic lives in `src/services/` and returns `Result<T>` (`@rules/errors.md`).
 - **Changes per use case**: the entry point (the single composition root), the thin adapter layer above the services, the build tool (`tsup` for Node, Vite for browser UI), and the release channel.
 
 ### When two use cases fit
 
 - **Library plus a small CLI on top**: the library is the product. Pick Library. A CLI wrapper is a second project that depends on the published library (that keeps the library free of `process.argv` and `process.exit`).
 - **Application that needs a backend**: the application is the UI project. The backend is a Service project. Phase 1 records the HTTP contract between them; the application never embeds server code.
-- **Extension with a settings screen**: still an Extension. The screen is a webview built with the same React base (`@rules/ui.md`).
+- **Extension with a settings screen**: still an Extension. The screen is a webview (Phase 1 question "Extension webview" = Yes) built with the same React base (`@rules/ui.md`).
 - **CLI that is also run on a schedule**: still a CLI. The scheduler only needs the exit codes (`@rules/cli.md`).
 
 ## Salesforce coupling and the use case
@@ -270,7 +270,7 @@ Personal by default: run locally from the built bundle (`yarn node dist/server.j
 ## 4. Extension
 
 ### What it is
-Code that runs inside another program (the **host**) and adds capabilities through the host's plugin API: commands, menus, panels, event handlers. The host loads it, calls its activation entry, and owns its lifecycle. The host is chosen in Phase 1 (closed question "Extension host"): **VS Code** is the recommended host and the one documented here; for any other host this framework prescribes only the common core plus what the user supplies in Phase 1.
+Code that runs inside another program (the **host**) and adds capabilities through the host's plugin API: commands, menus, panels, event handlers. The host loads it, calls its activation entry, and owns its lifecycle. The host and the presence of a webview are chosen in Phase 1 (closed questions "Extension host" and "Extension webview"): **VS Code** is the recommended host and the one documented here; for any other host this framework prescribes only the common core plus what the user supplies in Phase 1.
 
 ### When to pick it
 - The users already work inside the host and want the feature there, not in a separate window.
@@ -280,11 +280,12 @@ Code that runs inside another program (the **host**) and adds capabilities throu
 
 **When host = VS Code:**
 - The extension has a `package.json` manifest (`engines.vscode`, `main`, `contributes`, `activationEvents`) and uses the `vscode` API. It is packaged as a `.vsix` built with `vsce`.
+- **Bundle**: a single CommonJS file `dist/extension.cjs` (`main: ./dist/extension.cjs`), `vscode` external, every other dependency embedded (the `.vsix` ships no `node_modules`), target aligned with the `engines.vscode` floor. The project keeps `"type": "module"`, which is why the CommonJS output carries the `.cjs` extension (`@rules/config.md`).
 - For the detailed host rules (manifest, webview CSP and messaging, state, packaging flags), use the dedicated `vscode` generator framework for host-specific rules. This framework prescribes only the common core below: composition root `src/extension.ts`, `src/contributions/`, services, typed and validated webview messages, `Result` and named errors.
 
 **Another host (browser extension, JetBrains IDE, other):**
 - This framework prescribes only the common core below (same list as above). Nothing host-specific is assumed: no manifest field, no API name, no packaging or publish command.
-- The host's manifest or activation contract and its packaging command (or a path to its documentation) are what the user stated in Phase 1, recorded in `docs/specs/01-scoping.md`. Use only those; if one is missing, ask, never invent.
+- The host's manifest or activation contract, its packaging command, the module format its loader expects and the modules it provides at run time (or a path to its documentation) are what the user stated in Phase 1, recorded in `docs/specs/01-scoping.md`. Use only those; if one is missing, ask, never invent.
 - The VS Code specifics in the rest of this section (the `.vsix`, the `vscode` API, the output channel) are examples of the host mechanism: another host follows the same boundary with its own equivalents.
 
 ### Entry point and composition root
@@ -298,7 +299,7 @@ src/
 ├── config.ts · types.ts · errors.ts      # types.ts holds the HostApi and Logger interfaces
 ├── contributions/         # commands, views, handlers declared to the host: thin adapters
 ├── services/              # business logic, returns Result<T>, no host import
-├── ui/                    # only if the extension shows a React webview (own entry main.tsx) - @rules/ui.md
+├── ui/                    # only if `webview = Yes` (own entry main.tsx) - @rules/ui.md
 └── sf/                    # Salesforce coupling only, host-process side
 ```
 
@@ -307,15 +308,15 @@ src/
 | ---------------------------- | ----------------------------------------------------------------- |
 | Install dependencies         | `yarn install`                                                    |
 | Typecheck / lint / format    | `yarn typecheck` · `yarn lint` · `yarn format`                    |
-| Bundle the host-side code    | `yarn build` (`tsup` -> `dist/extension.js`)                      |
+| Bundle the host-side code    | `yarn build` (`tsup` -> `dist/extension.cjs`)                     |
 | Bundle a webview (if any)    | built by Vite, see `@rules/ui.md`                                 |
 | Tests (if enabled)           | `yarn test`                                                       |
 
 - Manual testing: when host = VS Code, package the `.vsix` and install it by hand in VS Code (packaging flags: the `vscode` framework). Another host: package and install per the contract the user stated in Phase 1.
-- The host often provides the APIs at run time, so the bundle must treat them as external, not bundle them.
+- The host provides its own APIs at run time (for VS Code, the `vscode` module), so the bundle keeps those external; every other dependency is embedded, because the packaged artifact carries no `node_modules` (`@rules/config.md`).
 
 ### Errors and logging
-- Contributions catch named errors and `Result` failures and show them through the host's notification mechanism, in the user's language. A throw must never escape an activation or a command handler: the host may disable the whole extension.
+- Contributions catch named errors and `Result` failures and show them through the host's notification mechanism, in the user's language. A throw must never escape an activation or a command handler: the host may disable the whole extension. The extension installs **no global process handler** (`uncaughtException` / `unhandledRejection`): the host process is shared with other extensions and owned by the host, so every command and event handler body is wrapped instead.
 - No pino, no `logger.ts`. Logs go through an injected `Logger` (interface in `types.ts`) that `extension.ts` implements with the host's log channel. Zero `console.log`.
 - Activation must be fast and must not fail on missing optional data.
 
@@ -406,4 +407,4 @@ Personal by default: `yarn build`, then `yarn preview` (Vite preview) or open th
 
 ## Integrity verification
 
-Detailed in `@rules/verification.md`. Key points: the use case recorded in `docs/specs/01-scoping.md` and `docs/specs/04-architect.md` matches the entry point that exists (`cli.ts`, `index.ts`, `server.ts`, `extension.ts`, or `main.tsx`) and there is only one; the tree matches the use case (no `commands/` or `output/` outside a CLI, no `routes/` outside a service, no `ui/` outside an application or a webview); the composition root is the only place that wires layers, installs global handlers (process entries), and calls `process.exit` (CLI, service); a library has no `process.*`, no `.env`, no global handler, and an explicit `exports` map; an extension service imports no host SDK; an application bundle contains no `src/sf/` and no secret in a `VITE_*` variable; `src/sf/` exists only with a confirmed Salesforce coupling; the release channel in `@rules/distribution.md` matches the use case.
+Detailed in `@rules/verification.md`. Key points: the use case recorded in `docs/specs/01-scoping.md` and `docs/specs/04-architect.md` matches the entry point that exists (`cli.ts`, `index.ts`, `server.ts`, `extension.ts`, or `main.tsx`) and there is only one; the tree matches the use case (no `commands/` or `output/` outside a CLI, no `routes/` outside a service, no `ui/` outside an application or a webview); the composition root is the only place that wires layers; global process handlers and `process.exit` live only in `cli.ts` and `server.ts` (an application installs browser listeners in `main.tsx`; a library and an extension install none); a library has no `process.*`, no `.env`, no global handler, and an explicit `exports` map; an extension service imports no host SDK; an application bundle contains no `src/sf/` and no secret in a `VITE_*` variable; `src/sf/` exists only with a confirmed Salesforce coupling; the release channel in `@rules/distribution.md` matches the use case.

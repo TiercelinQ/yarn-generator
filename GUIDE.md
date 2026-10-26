@@ -70,7 +70,7 @@ yarn/
 | **Optional Salesforce** | Detected in Phase 1 in three cases (see below). `sf` v2 only, never legacy `sfdx`. Without coupling: no Salesforce file loaded, no `src/sf/` layer. |
 | **Yarn Berry only** | Install, scripts and release go through `yarn`. Never `npm`, `npx` or `pnpm`. `package.json` + `yarn.lock` + `.yarnrc.yml` (`nodeLinker: node-modules`, no zero-install), version pinned by `packageManager`. |
 | **Two binding catalogs** | `yarn-berry-cli-reference/` (always) and `salesforce-cli-reference/` (only if Salesforce is confirmed). No command or flag invented from memory. |
-| **Common core** | `src/`, `test/` mirroring `src/`, shared files `config.ts`, `logger.ts` (where the use case requires it), `types.ts`, `errors.ts`. |
+| **Common core** | `src/`, `test/` mirroring `src/`, shared files `config.ts`, `logger.ts` (CLI tool and service only; the other use cases use an injected `Logger`), `types.ts`, `errors.ts`. |
 | **Rich output (CLI)** | JSON / table formatters always; CSV / xlsx only if selected in Phase 1. stdout or file destination. |
 | **Process security** | With Salesforce: every `sf` call goes through `cross-spawn` (args array, no shell) from `src/sf/runner.ts` only. Secrets in the `sf` keychain, never in a file. |
 
@@ -80,13 +80,13 @@ yarn/
 
 | Use case | Entry point | Typical output | Delivery channel (`rules/distribution.md`) |
 | -------- | ----------- | -------------- | ------------------------------------------ |
-| CLI tool    | `src/cli.ts`   | executable binary bundled by `tsup` | npm registry, or local run (`yarn dev`, `node dist/cli.js`) |
+| CLI tool    | `src/cli.ts`   | executable binary bundled by `tsup` | local run (`yarn dev`, `node dist/cli.js`) by default, npm registry (opt-in) |
 | Library | `src/index.ts` | importable package (ESM, types) | npm registry |
-| Service     | `src/server.ts` | long-running Node.js process | run locally, or external target (opt-in) |
-| Extension   | `src/extension.ts` | extension bundle for its host (VS Code recommended; host asked in Phase 1) | packaged artifact installed by hand (`.vsix` for VS Code), or host store (opt-in) |
-| Application | `src/main.tsx` | web UI built by Vite (React) | local build, or external target (opt-in) |
+| Service     | `src/server.ts` | long-running Node.js process | run locally by default, or external target (opt-in) |
+| Extension   | `src/extension.ts` | extension bundle for its host (VS Code recommended; host asked in Phase 1) | packaged artifact installed by hand by default (`.vsix` for VS Code), or host store (opt-in) |
+| Application | `src/main.tsx` | web UI built by Vite (React) | local build by default, or external target (opt-in) |
 
-- Build: `tsup` for Node targets (CLI, library, service), Vite for browser UI (application, extension webview).
+- Build: `tsup` for Node targets (CLI, library, service), Vite for browser UI (application, extension webview). The extension host side is a separate `tsup` target: CommonJS `dist/extension.cjs` with every dependency embedded except `vscode` (host = VS Code), the project keeping `"type": "module"`.
 - CLI-specific rules (`cli.md`, `output.md`, `progress.md`): apply only to the CLI use case.
 - `jsdom` + `@testing-library/react`: projects with UI only. A headless CLI does not use `jsdom`.
 
@@ -136,11 +136,11 @@ sf --version          # Salesforce CLI v2 (only if Salesforce coupling is confir
 
 Objective (free text), then project name + root (a single kebab-case name, used for the folder AND for the `bin` of a CLI; location; creation), then the closed parameters via `AskUserQuestion` (4 questions maximum per call, several calls if needed), each option carrying a one-line consequence:
 
-- **use case** (CLI tool / library / service / extension / application; for an extension, the **host**, VS Code recommended) · **Salesforce context** (per the three cases above; if confirmed: `standalone` / `sfdx-project` mode, and folder path if `sfdx-project`) · tests (`vitest`) · for a CLI: output formats (JSON + table, plus CSV / xlsx if wanted: only the selected formats ship) and interactivity (non-interactive / prompts).
+- **use case** (CLI tool / library / service / extension / application; for an extension, the **host**, VS Code recommended, and whether it has a **webview**) · **Salesforce context** (per the three cases above; if confirmed: `standalone` / `sfdx-project` mode, and folder path if `sfdx-project`) · tests (`vitest`) · **distribution** (personal use, or external publication with a target; a library always ships to the npm registry and is not asked) · for a CLI: output formats (JSON + table, plus CSV / xlsx if wanted: only the selected formats ship) and interactivity (non-interactive / prompts) · for an application or an extension webview: styling approach and UI libraries.
 
-Framework defaults not asked: strict TypeScript + ESM, Yarn Berry, `tsup` build (Node) or Vite (UI), `commander` parser and progress reporter (CLI only), `pino` logger (CLI and service). **Project shape defaults, overridden on request only**: execution shape, distribution (use case channel), config strategy = cascade `config.ts < .env < flags`. Salesforce/SFDX detection on the objective: `deploy`/`retrieve`/`source`/`sfdx-project` recommends `sfdx-project`, otherwise `standalone`.
+Framework defaults not asked: strict TypeScript + ESM, Yarn Berry, `tsup` build (Node) or Vite (UI), `commander` parser and progress reporter (CLI only), `pino` logger (CLI and service; the other use cases use an injected `Logger`). **Project shape defaults, overridden on request only**: execution shape, config strategy = cascade `config.ts < .env < flags`. Salesforce/SFDX detection on the objective: `deploy`/`retrieve`/`source`/`sfdx-project` recommends `sfdx-project`, otherwise `standalone`.
 
-**Internal** sizing (not announced in Phase 1, determined in Phase 2; drives the batch split of Phase 5):
+**Provisional calibration**, announced at the end of Phase 1 (`Provisional calibration: [size] - [N] batches`), confirmed and locked at the end of Phase 2 on the v1.0 feature count; it drives the batch split of Phase 5:
 
 | Size          | Batches (no tests) | Batches (with tests) |
 | ------------- | ------------------ | -------------------- |
@@ -151,7 +151,7 @@ Writes `docs/specs/01-scoping.md`.
 
 ### Phase 2 - Featuring
 
-Name confirmation (from Phase 1, adjustable only if the `bin` must differ from the folder for a CLI). Elicitation of the **features** (commands for a CLI), MoSCoW, v1.0 scope. Sizing determined internally from the v1.0 feature count (drives the batches, not a separate validated step). Blocking validation on the features / scope. Writes `docs/specs/02-featuring.md`.
+Name confirmation (from Phase 1, adjustable only if the `bin` must differ from the folder for a CLI). Elicitation of the **features** (commands for a CLI), MoSCoW, v1.0 scope. Calibration confirmed here from the v1.0 feature count (it refines the Phase 1 provisional announcement and is locked with the features validation, not a separate confirmation step). Blocking validation on the features / scope. Writes `docs/specs/02-featuring.md`.
 
 ### Phase 3 - Surfaces
 
@@ -171,7 +171,7 @@ Tree per use case (and the `src/sf/` layer if Salesforce is confirmed) + role of
 
 ### Phase 5 - Development
 
-Files written directly to disk. Announces `Batch N/[total] - [content]`. Automatic chaining. Batch 1 is the core (`types`, `errors`, `config`, `logger`, and for a CLI `progress` + `output/`; plus the `sf` runner and helpers when Salesforce is confirmed), because services import `logger` and `progress` from batch 2. The composition root (entry point) goes in the last batch. Last batch: `package.json` + `.yarnrc.yml` + configs (including `.prettierignore`, so `yarn format` never touches the Yarn bundle or the lockfile), `README.md`, project `CLAUDE.md` (identity), `.claude/settings.json` (deny + `Stop` hook). Executable verification applied.
+Files written directly to disk. Announces `Batch N/[total] - [content]`. Automatic chaining. Batch 1 is the core (`types`, `errors`, `config`, `logger` for a CLI tool or a service, and for a CLI `progress` + `output/`; plus the `sf` runner and helpers when Salesforce is confirmed), because services import `logger` and `progress` from batch 2 (CLI tool and service). The composition root (entry point) goes in the last batch. Last batch: `package.json` + `.yarnrc.yml` + configs (including `.prettierignore`, so `yarn format` never touches the Yarn bundle or the lockfile), `README.md`, project `CLAUDE.md` (identity), `.claude/settings.json` (deny + `Stop` hook). Executable verification applied.
 
 ---
 
@@ -283,7 +283,7 @@ mon-projet/
 ├── test/                          # Mirror of src/ (if tests enabled)
 └── src/
     ├── cli.ts                     # bin: commander program, Result → exit code mapping (index.ts, server.ts, extension.ts or main.tsx for the other use cases)
-    ├── config.ts · logger.ts · progress.ts · types.ts · errors.ts   # shared - importable by all layers
+    ├── config.ts · logger.ts · progress.ts · types.ts · errors.ts   # shared - importable by all layers (logger.ts: CLI tool and service; progress.ts: CLI tool)
     ├── sf/                        # Salesforce only: runner.ts (cross-spawn) · helpers.ts · project.ts (sfdx mode)
     ├── services/                  # business logic - returns Result<T>
     ├── commands/                  # CLI only: thin adapters
@@ -294,7 +294,7 @@ mon-projet/
 
 ### Versioning & changelog
 
-Each generated project carries a SemVer version and a changelog `docs/release/CHANGELOG.md` (Keep a Changelog format, written in English). The maintenance skills (`add-feature`, `fix-issue`, `refactor-code`) accumulate their entries under `## [Unreleased]`; `/yarn-release` freezes them into a dated version block and bumps the version source (`package.json`; `APP_VERSION` is derived from it, nothing to sync), then follows the use case delivery channel (`rules/distribution.md`). The version is never bumped silently. See `rules/versioning.md`.
+Each generated project carries a SemVer version and a changelog `docs/release/CHANGELOG.md` (Keep a Changelog format, written in English). The maintenance skills (`add-feature`, `fix-issue`, `refactor-code`) accumulate their entries under `## [Unreleased]`; `/yarn-release` freezes them into a dated version block and bumps the version source (`package.json`; `APP_VERSION` is derived from it, nothing to sync), then follows the use case delivery channel (`rules/distribution.md`; a library always ships to the npm registry). The version is never bumped silently. See `rules/versioning.md`.
 
 ---
 

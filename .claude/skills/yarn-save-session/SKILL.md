@@ -39,13 +39,15 @@ Next batch: [X+1/total] (if Phase 5)
 
 ## Locked decisions
 
-- Use case: [CLI tool | library | service | extension | application]
+- Use case: [CLI tool | library | service | extension | application] [· host and webview Yes/No for an extension]
 - Target: Node.js 24+ · ESM · TypeScript strict · Yarn Berry 4.x [· commander (CLI tool) | · Vite + React (UI)]
 - Salesforce coupling: [none | confirmed - standalone | confirmed - sfdx-project] (decided in Phase 1)
 - Output formats: [the shipped formats: json · table, plus csv · xlsx if shipped] (CLI tool only, omit otherwise)
 - Execution shape: [commands only | + standalone scripts] (CLI tool only, omit otherwise)
+- UI choices: [styling approach · UI libraries] (application and extension webview only, omit otherwise)
 - Tests: [Yes (Vitest) / No]
-- Calibration: [Small 3 batches / Medium-Large 4 batches] (+1 test batch if tests enabled)
+- Distribution: [Personal use only | External publication - target and artifact format | npm registry (library)]
+- Calibration: [Small 3 batches / Medium-Large 4 batches] (+1 test batch if tests enabled; provisional in Phase 1, confirmed in Phase 2)
 - Selected features: [list]
 - Out of scope: [list]
 - Validated libraries: [list]

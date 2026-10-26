@@ -88,12 +88,14 @@ yarn dev                      # dev server (tsx)
 yarn build                    # tsup - produces dist/server.js
 yarn node dist/server.js      # personal use: run locally from the built bundle
 [Extension]
-yarn build                    # extension bundle
+yarn build                    # extension bundle (host = VS Code: CommonJS dist/extension.cjs, every dependency embedded except vscode)
 [.vsix built with vsce and installed by hand in VS Code; the exact packaging command comes from the `vscode` framework. This line assumes host = VS Code; another host follows the same boundary with its own notification and log mechanism, and its packaging and install lines come from `docs/specs/01-scoping.md`]
 [Application]
 yarn dev                      # Vite dev server
 yarn build                    # Vite production build
 yarn preview                  # personal use: serve the built dist/ locally
+
+Dependency audit (advisory, any use case): `yarn npm audit --recursive` (non-zero exit when advisories exist).
 
 [CLI tool only] Scheduling (unattended runs): Windows Task Scheduler or cron - invoke `node dist/cli.js <command>` with the required flags; data on stdout, logs on stderr.
 

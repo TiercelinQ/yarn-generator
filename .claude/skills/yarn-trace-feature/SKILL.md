@@ -27,7 +27,7 @@ A structured report (in the user's language) with `file:line` references. Option
 
 3. **Read the relevant sources** by layer. First read the use case and the Salesforce coupling from `docs/specs/04-architect.md`, then trace only the layers that exist for it:
    - Contract & specs: `docs/specs/04-architect.md` (structure of truth), other `docs/specs/*`.
-   - Shared: `src/config.ts` (`AppConfig` + `resolveConfig`), `src/types.ts` (`Result<T>` + DTOs), `src/errors.ts` (named errors), `src/logger.ts` (pino, where the use case imposes it; log file `~/.<tool>/logs/app.log` for a CLI tool).
+   - Shared: `src/config.ts` (`AppConfig` + `resolveConfig`), `src/types.ts` (`Result<T>` + DTOs), `src/errors.ts` (named errors), `src/logger.ts` (pino, CLI tool and service only; log file `~/.<tool>/logs/app.log` for a CLI tool; library, extension and application use an injected `Logger`).
    - Composition root / boundary, by use case: `src/cli.ts` (CLI tool: commander bootstrap, global handlers, exit-code mapping) · `src/index.ts` (library: public exports) · `src/server.ts` (service: server bootstrap, global handlers, status-code mapping) · `src/extension.ts` (extension: activation, contributions) · `src/main.tsx` (application: React root, routing).
    - Adapters, by use case: `src/commands/<group>.ts` (CLI) · public modules (library) · route handlers (service) · contribution handlers (extension) · screens and components (application, `@rules/ui.md`). All thin.
    - Services: `src/services/<domain>.service.ts` (business logic).

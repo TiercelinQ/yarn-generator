@@ -23,7 +23,9 @@ At start: read `docs/specs/01-scoping.md` through `03-surfaces.md` for the valid
 - always: `@rules/architecture.md` (layer tree, batch tables, layering contract), `@rules/use-cases.md` (entry point and structure of each use case), `@rules/config.md`, `@rules/errors.md`;
 - **CLI tool**: `@rules/cli.md` (composition root, exit codes), `@rules/output.md`, `@rules/progress.md` (the runtime progress reporter), `@rules/logging.md`;
 - **Service**: `@rules/logging.md`, `@rules/security.md`;
-- **Application, or extension with a webview**: `@rules/ui.md`;
+- **Application, or extension with `webview = Yes`**: `@rules/ui.md`;
+- **Library, extension, application**: `@rules/logging.md` (injected `Logger`, no `src/logger.ts`);
+- **always, for the release channel**: `@rules/distribution.md`;
 - **Salesforce coupling confirmed in Phase 1**: `@rules/sf-cli.md` (runner, typed helpers, starter scaffold); **if the coupling mode is `sfdx-project`, also `@rules/sfdx-project.md`** (project detection, `deploy` / `retrieve`);
 - **if tests were enabled (Phase 1)**: `@rules/tests.md`.
 
@@ -34,16 +36,17 @@ Present (in the user's language, as plain Markdown - never inside a code block, 
    | Use case | Composition root | Adapter layer above `services/` | Specific files |
    | -------- | ---------------- | ------------------------------- | -------------- |
    | CLI tool | `src/cli.ts` | `src/commands/<group>.ts` | `src/progress.ts`, `src/output/` (formatters), `src/logger.ts` |
-   | Library | `src/index.ts` | none (the public API re-exports from `services/` and `types.ts`) | `tsup` emits `.d.ts` |
+   | Library | `src/index.ts` | none (the public API re-exports from `services/` and `types.ts`) | `tsup` emits `.d.ts`; no `src/logger.ts` (injected `Logger`) |
    | Service | `src/server.ts` | `src/routes/<domain>.ts` (thin handlers) | `src/logger.ts` |
-   | Extension | `src/extension.ts` | `src/contributions/<name>.ts` (host contributions) | webview sources per `@rules/ui.md` if it has one |
-   | Application | `src/main.tsx` | `src/ui/screens/`, `src/ui/components/` | per `@rules/ui.md` (Vite + React) |
+   | Extension | `src/extension.ts` | `src/contributions/<name>.ts` (host contributions) | no `src/logger.ts` (injected `Logger` over the host log channel); webview sources per `@rules/ui.md` if `webview = Yes` |
+   | Application | `src/main.tsx` | `src/ui/screens/`, `src/ui/components/` | per `@rules/ui.md` (Vite + React); no `src/logger.ts` (injected `Logger`) |
 
    The exact directory names and file roles follow `@rules/architecture.md` / `@rules/use-cases.md`; write the full tree of the chosen use case from them. Conditionals:
    - `src/sf/` (`runner.ts` + `helpers.ts`) ships **only when Salesforce coupling is confirmed**; without coupling there is no `src/sf/` layer at all.
    - `src/sf/project.ts` ships **only** in `sfdx-project` mode; in `standalone` mode `src/sf/` is `runner.ts` + `helpers.ts`.
    - `scripts/` exists **only** when the execution shape (Phase 1) includes standalone one-off scripts (CLI tool).
    - `test/` exists **only** when tests were enabled in Phase 1.
+   - **Extension bundle** (`tsup`, `@rules/config.md`): when host = VS Code, CommonJS `dist/extension.cjs`, every dependency embedded except `vscode`, target aligned with the `engines.vscode` floor, `main: ./dist/extension.cjs`, `"type": "module"` kept; for another host, the module format and the host-provided modules come from what the user stated in Phase 1.
    - `src/progress.ts` ships in **every CLI tool** - on `stderr`, auto-TTY, `--no-progress` (`@rules/progress.md`); `step` always ships, `bar` ships only when an operation with a known total exists (no dead code). It does not exist in the other use cases.
    - `src/output/` ships **only in the CLI tool**: `json.ts` and `table.ts` always, `csv.ts` / `xlsx.ts` only if selected in the Phase 1 "Output formats" question (`@rules/output.md`).
    - One `src/services/<domain>.service.ts` per domain from the interface spec, and one adapter file per group / domain / contribution / screen group.
@@ -71,9 +74,9 @@ Present (in the user's language, as plain Markdown - never inside a code block, 
    - **CLI tool** (`@rules/cli.md`): thrown errors via the single `toExitCode` (`ValidationError`/commander usage → `2`, else `1`); returned `Result` failures via the fixed `warning → 0` / `error → 1`; success → `0`. A command that returns a dataset (list, query, export) treats an empty result as **success** (valid empty document, exit `0`); `warning` is kept for non-dataset commands where nothing was done. `process.exit` only in `cli.ts`.
    - **Library**: `Result<T>` returned or a named error raised, per the Phase 3 choice; no `process.exit`, no `console`.
    - **Service**: named error → HTTP status (the table of Phase 3) in the route layer.
-   - **Extension**: named error → host notification in the contribution handler.
+   - **Extension**: named error → host notification in the contribution handler; every command and event handler body is wrapped, the detail goes to the injected `Logger`.
    - **Application**: named error → user-facing message in the screen layer.
-   - A global `uncaughtException` / `unhandledRejection` handler is mandatory in a Node.js entry point (CLI tool, service, extension host side).
+   - Global handlers: `uncaughtException` / `unhandledRejection` are mandatory in the process entries `cli.ts` and `server.ts` only. A library and an extension install none (the host owns the process). The application installs `window` `error` / `unhandledrejection` listeners in `main.tsx` (`@rules/errors.md`).
 
 4. **Config keys table** - the `AppConfig` cascade (`@rules/config.md`): each key, its `.env` variable, its global CLI flag (CLI tool only), type, and default. Example for a CLI tool with Salesforce; keep only the rows that apply and add the use-case keys from Phase 3 (e.g. service host / port):
 
@@ -86,13 +89,15 @@ Present (in the user's language, as plain Markdown - never inside a code block, 
    | `pageSize` | `SF_PAGE_SIZE` | `--page-size` | positive int | `2000` |
    | `sfPath` | `SF_CLI_PATH` | `--sf-cli-path` | absolute path | `PATH` |
 
-   The four `sf` rows exist only when Salesforce is confirmed. **Storage-path keys** (a data file or config file the user chooses as the tool's own storage, e.g. `dataFile`) are resolved with `path.resolve`, not confined under `exportDir`: record that choice as a **documented deviation** in the contract (`@rules/security.md` section 3); only paths *written* as exports/outputs are confined with `resolveWithin`. Non-secret only - with Salesforce, `sf` owns credentials in the OS keychain and the project stores at most a non-secret alias (`@rules/security.md`). `.env` is loaded natively (`process.loadEnvFile()`), no `dotenv`.
+   The four `sf` rows exist only when Salesforce is confirmed. **Storage-path keys** (a data file or config file the user chooses as the project's own storage, e.g. `dataFile`) are resolved with `path.resolve`, not confined under `exportDir`: record that choice as a **documented deviation** in the contract (`@rules/security.md` section 3); only paths *written* as exports/outputs are confined with `resolveWithin`. Non-secret only - with Salesforce, `sf` owns credentials in the OS keychain and the project stores at most a non-secret alias (`@rules/security.md`). `.env` is loaded natively (`process.loadEnvFile()`), no `dotenv`.
 
 5. **Coupling mode** - **only when Salesforce is confirmed**: `standalone` or `sfdx-project` (fixed in Phase 1), materialized as `COUPLING_MODE` in `config.ts`. **If `sfdx-project`**: the project detection is part of the contract - `detectSfdxProject(process.cwd())` resolved once at startup in the composition root, a missing/invalid `sfdx-project.json` → fatal `ProjectNotFoundError` + non-zero exit; `.forceignore` delegated to `sf`; the default package directory read from `packageDirectories` (never hardcoded). File: `src/sf/project.ts` (`@rules/sfdx-project.md`). Without Salesforce: state `Coupling: none` and omit `COUPLING_MODE`.
 
 6. **Output formatters in scope** - **CLI tool only**: `json` and `table` always ship; `csv` and `xlsx` ship only if selected in Phase 1 (with their `csv-stringify` / `exceljs` dependency). Each is a file in `src/output/` behind the single `formatOutput(rows, { format, destination })` dispatch, which handles only the shipped formats (an unknown format is a `ValidationError`, exit `2`). `output/` imports only `types` (pure presentation, no `sf`/service dependency). If `xlsx` ships, the command validates "xlsx requires a file destination" **before any work** (`ValidationError`, exit `2`); the writer keeps its `Result` error guard as a backstop (`@rules/output.md`). Other use cases: state `Output formatters: n/a`.
 
 7. **Source → test mapping** (only if tests enabled in Phase 1) - each source module → its `test/...test.ts` file, mirroring `src/` (`@rules/tests.md`): `test/services/*.service.test.ts` (fake `SfHelpers` when coupled), `test/config.test.ts`, and per use case: `test/commands/*.test.ts` + `test/output/*.test.ts` (CLI tool), `test/index.test.ts` (library public API), `test/routes/*.test.ts` (service), `test/contributions/*.test.ts` (extension), `test/ui/screens/*.test.tsx` + `test/ui/components/*.test.tsx` (application, with `jsdom` + `@testing-library/react`). When Salesforce is confirmed: `test/sf/runner.test.ts` (mock `cross-spawn`), `test/sf/helpers.test.ts` (fake `SfRunner`) (+ `test/sf/project.test.ts` in `sfdx-project` mode). A headless CLI tool never uses `jsdom`.
+
+8. **Distribution and release channel** - recorded from Phase 1 (`docs/specs/01-scoping.md`): the chosen distribution (`Personal use only`, or `External publication` with the target and artifact format the user stated), the channel `/yarn-release` will use at its Step 6 (library: npm registry, always; CLI tool: npm registry only on external publication; service, extension, application: the stated target, otherwise none), and the pre-publication gate of `@rules/distribution.md`. Nothing is published without explicit confirmation; no publish command that the user or a verified catalog page did not give.
 
 **Frozen calibration** - restate the batch count fixed after Phase 2 (`## CALIBRATION` in `CLAUDE.md`): Small = **3** batches (**4** with tests) · Medium/Large = **4** batches (**5** with tests). Map the batch contents from `@rules/architecture.md`: Batch 1 = `types` + `errors` + `config` + `src/logger.ts` (where the use case ships it) + (CLI tool) `src/progress.ts` + (when coupled) `src/sf/` (runner + helpers, + `project.ts` if sfdx) + (CLI tool) `src/output/` - the core, because services import `logger` and `progress` (`progress.step`) from Batch 2 (`@rules/architecture.md`, `## CALIBRATION` in `CLAUDE.md`); the business layers next (`services` then the adapter layer, split for Medium/Large); the last batch = composition root + root configs (incl. `.prettierignore`) + `package.json` + `.yarnrc.yml` + README + `CLAUDE.md` + `.claude/settings.json` + changelog seed + session S0; the test batch last (if tests). The `sf` runner + helpers ship in **Batch 1** (no dedicated Salesforce batch).
 

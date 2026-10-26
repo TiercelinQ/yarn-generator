@@ -2,7 +2,7 @@
 
 > Senior Node.js / TypeScript / Yarn Berry expert. Generates TypeScript projects for five use cases: CLI tool, library, service, extension, application (with UI). Salesforce coupling is optional and detected in Phase 1. Layered architecture with one composition root per use case.
 > Do not explain general programming concepts. Explain only the Node.js / TypeScript / Yarn Berry specifics that deviate from what a generic senior developer would expect.
-> Framework version: 1.0.0. This version is recorded in each generated project's `CLAUDE.md`.
+> Framework version: 1.0.1. This version is recorded in each generated project's `CLAUDE.md`.
 
 ---
 
@@ -42,13 +42,13 @@ Phase 1 fixes the **use case** of the generated project. It is a fixed property 
 
 | Use case    | Entry point      | Typical output                                  | Release channel (see `rules/distribution.md`) |
 | ----------- | ---------------- | ----------------------------------------------- | --------------------------------------------- |
-| CLI tool    | `src/cli.ts`     | executable bin bundled by `tsup`                | npm registry, or local run (`yarn dev`, `node dist/cli.js`) |
-| Library     | `src/index.ts`   | importable package (ESM, types)                 | npm registry                                  |
-| Service     | `src/server.ts`  | long-running Node.js process                    | run locally, or external target (opt-in)      |
-| Extension   | `src/extension.ts` | extension bundle for its host (VS Code recommended; host asked in Phase 1) | packaged artifact installed by hand (`.vsix` for VS Code), or host store (opt-in) |
-| Application | `src/main.tsx`   | web UI built by Vite (React)                    | local build, or external target (opt-in)      |
+| CLI tool    | `src/cli.ts`     | executable bin bundled by `tsup`                | local run (`yarn dev`, `node dist/cli.js`) by default, npm registry (opt-in) |
+| Library     | `src/index.ts`   | importable package (ESM, types)                 | npm registry (always, not asked in Phase 1)   |
+| Service     | `src/server.ts`  | long-running Node.js process                    | run locally by default, or external target (opt-in) |
+| Extension   | `src/extension.ts` | extension bundle for its host (VS Code recommended; host asked in Phase 1) | packaged artifact installed by hand by default (`.vsix` for VS Code), or host store (opt-in) |
+| Application | `src/main.tsx`   | web UI built by Vite (React)                    | local build by default, or external target (opt-in) |
 
-The five use cases share the same **common core**: `src/`, `test/` mirroring `src/`, and the shared files `config.ts`, `logger.ts` (where the use case imposes it), `types.ts`, `errors.ts`. Only the entry point and the layers above it change. Detail: `rules/architecture.md`.
+The five use cases share the same **common core**: `src/`, `test/` mirroring `src/`, and the shared files `config.ts`, `logger.ts` (CLI tool and service only; library, extension and application use an injected `Logger`), `types.ts`, `errors.ts`. Only the entry point and the layers above it change. Detail: `rules/architecture.md`.
 
 ---
 
@@ -136,7 +136,7 @@ The generation pipeline writes a persisted spec file per phase into `docs/specs/
 | UI               | Vite + React + TypeScript strict - projects with UI only - see `rules/ui.md`                                                           |
 | Config           | Cascade `config.ts` < `.env` (native `--env-file`) < CLI flags (CLI) · non-secret only - see `rules/config.md`                         |
 | Secrets          | Never in a file                                                                                                                        |
-| Logging          | `pino` (file + `stderr`, `pino-pretty` in dev) for CLI and service; CLI log file in `~/.<tool>/logs/app.log` - see `rules/logging.md` |
+| Logging          | `pino` (file + `stderr`, `pino-pretty` in dev) for CLI and service; CLI log file in `~/.<tool>/logs/app.log`; injected `Logger` otherwise - see `rules/logging.md` |
 | Runtime feedback | Progress reporter on `stderr` - CLI use case only - see `rules/progress.md`                                                            |
 | Output           | Formatters JSON · console table always; CSV (`csv-stringify`) · xlsx (`exceljs`) only if selected in Phase 1 - CLI use case only - see `rules/output.md` |
 | Error contract   | `Result<T>` + named errors + exit-code mapping at the CLI boundary - see `rules/errors.md`                                             |
@@ -154,16 +154,16 @@ The generation pipeline writes a persisted spec file per phase into `docs/specs/
 - When Salesforce is confirmed, all `sf` calls go through `src/sf/runner.ts` via **`cross-spawn`** (resolves the Windows `sf.cmd` shim, escapes args) with an **argument array** - never `node:child_process` directly, never a concatenated shell string, never from a `services`/`commands` module. See `rules/sf-cli.md` and `rules/security.md`.
 - **Layering** - the entry point (`cli.ts`, `index.ts`, `server.ts`, `extension.ts`, `main.tsx`) is the only composition root. Adapters stay thin, business logic lives in `services/`, no layer skips another. See `rules/architecture.md`.
 - **CLI I/O contract (CLI use case)** - `stdout` carries **data only** (pipeable); `stderr` carries logs and human messages. Exit codes: `0` success · `1` runtime error · `2` usage/validation error. `process.exit` only in `cli.ts`. See `rules/cli.md`.
-- **Error contract** - library layers (`services`, `sf`, `output`) return `Result<T>` or raise a **named error** (`src/errors.ts`); never throw a raw exception to the user. The boundary of the use case maps a failed `Result` / caught named error to a message and, for a CLI, an exit code. A global `uncaughtException` / `unhandledRejection` handler is mandatory in a process entry point (CLI tool, service); a library installs none. See `rules/errors.md`.
+- **Error contract** - library layers (`services`, `sf`, `output`) return `Result<T>` or raise a **named error** (`src/errors.ts`); never throw a raw exception to the user. The boundary of the use case maps a failed `Result` / caught named error to a message and, for a CLI, an exit code. A global `uncaughtException` / `unhandledRejection` handler is mandatory in the process entries `cli.ts` and `server.ts`; a library and an extension install none (the host owns the process; every extension handler body is wrapped); the browser application installs `window` `error` / `unhandledrejection` listeners in `main.tsx`. See `rules/errors.md`.
 - **Secrets** - never written to `.env`, `config.ts`, logs, or committed. With Salesforce, `sf` holds all tokens in the OS keychain; the project stores at most a **non-secret** org alias. See `rules/security.md`.
 - **Config** - non-secret settings resolve through the cascade `config.ts` defaults < `.env` < CLI flags in a single `resolveConfig()`. `.env` is read natively (`node --env-file`), never committed. See `rules/config.md`.
 - **Output (CLI use case)** - every user-facing dataset goes through the `output/` formatters (`json` and `table` always; `csv` and `xlsx` only if selected in Phase 1) with an explicit destination (`stdout` | file). An empty dataset is a success (valid empty document, exit `0`). No ad-hoc `console.log(JSON.stringify(...))` in a command. See `rules/output.md`.
-- **Logging** - `src/logger.ts` (pino) mandatory for the CLI and service use cases; zero `console.log` in delivered code (only `log.*`); never log a token or secret. Other use cases follow `rules/use-cases.md`. See `rules/logging.md`.
+- **Logging** - `src/logger.ts` (pino) mandatory for the CLI and service use cases; zero `console.log` in delivered code (only `log.*`); never log a token or secret. Library, extension and application have no `src/logger.ts`: they use an injected `Logger` (`rules/use-cases.md`). See `rules/logging.md`.
 - **Runtime feedback (CLI use case)** - a hand-rolled progress reporter (`src/progress.ts`: `step` always, `bar` only when an operation has a known total) shows the operations a command performs on **`stderr`**, **auto-on a TTY**, `--no-progress` to disable. See `rules/progress.md`.
 - **UI (projects with UI)** - Vite + React + TypeScript strict; conventions in `rules/ui.md`.
 - If the coupling mode is `sfdx-project` (Phase 1): detect and read `sfdx-project.json`, respect `.forceignore`, and scope `sf project ...` commands to the project. See `rules/sfdx-project.md`.
 - If tests enabled in Phase 1: test suite mandatory (`vitest`) - see `rules/tests.md`.
-- **Release** - the release channel follows the use case, see `rules/distribution.md`. The default is personal distribution; external publication is opt-in, chosen in Phase 1 (`/yarn-p1-scoping`) and recorded in `docs/specs/01-scoping.md`. The version is bumped only by `/yarn-release`.
+- **Release** - the release channel follows the use case, see `rules/distribution.md`. The default is personal distribution (a library always ships to the npm registry and is not asked); external publication is opt-in, chosen in Phase 1 (`/yarn-p1-scoping`) and recorded in `docs/specs/01-scoping.md`. The version is bumped only by `/yarn-release`.
 - Zero `// TODO`, zero unjustified empty implementation. ESLint clean · Prettier · TS strict with no unjustified `any` (incoming external data is `unknown` then validated).
 - No library that was not validated in Phase 1. When `package.json` is written, the validated ranges of `rules/config.md` are used as written (for example `eslint ^10.12.0`, not `^10`).
 - At project finalization (last batch of Phase 5): generate a `CLAUDE.md` at the generated project root - origin (framework + version), business context, framework deviations - and seed `docs/release/CHANGELOG.md` (Keep a Changelog, English, initial `1.0.0`), and write the delivery baseline session `docs/sessions/SESSION_[project]_S0.md` (`/yarn-save-session` template, `N = 0`, overwritten if Phase 5 is replayed). See `/yarn-p5-development` and `rules/versioning.md`.
@@ -241,4 +241,4 @@ Canonical source of the calibration. Skills refer to it - do not duplicate this 
 | Small          | < 10  | ≤ 5      | 3                  | 4                    |
 | Medium / Large | ≥ 10  | > 5      | 4                  | 5                    |
 
-The extra batch corresponds to the test suite + dev dependencies (see `rules/tests.md`). Divergent criteria (e.g. < 10 files but > 5 features): the highest criterion wins → Medium/Large. The core ships in **Batch 1**: `types`, `errors`, `config`, `logger.ts` and (CLI) `progress.ts` (services import them from Batch 2), `output/` (CLI), and the Salesforce `sf` runner and helpers when coupled (no dedicated batch). The composition root (entry point) ships in the last batch, with the root configs (including `.prettierignore`), `package.json`, README, `CLAUDE.md`, `.claude/settings.json`, the changelog seed and session S0. The `output/` formatters (CLI), the Salesforce `sf/` layer, and the UI each add files and push the size up.
+The extra batch corresponds to the test suite + dev dependencies (see `rules/tests.md`). Divergent criteria (e.g. < 10 files but > 5 features): the highest criterion wins → Medium/Large. The core ships in **Batch 1**: `types`, `errors`, `config`, `logger.ts` (CLI tool, service) and (CLI) `progress.ts` (services import them from Batch 2), `output/` (CLI), and the Salesforce `sf` runner and helpers when coupled (no dedicated batch). The composition root (entry point) ships in the last batch, with the root configs (including `.prettierignore`), `package.json`, README, `CLAUDE.md`, `.claude/settings.json`, the changelog seed and session S0. The `output/` formatters (CLI), the Salesforce `sf/` layer, and the UI each add files and push the size up.

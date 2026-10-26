@@ -8,7 +8,7 @@
 
 ## What the README documents
 
-The common sections are always present: objective · stack & dependencies · file tree · config keys (`.env` variables, plus CLI flags for a CLI) · install & build (`yarn install`, `yarn build`) · version. The remaining sections depend on the **use case** fixed in Phase 1 (`@rules/use-cases.md`):
+The common sections are always present: objective · stack & dependencies · file tree · config keys (`.env` variables, plus CLI flags for a CLI) · install & build (`yarn install`, `yarn build`) · dependency audit reminder (`yarn npm audit --recursive`, advisory) · version. The remaining sections depend on the **use case** fixed in Phase 1 (`@rules/use-cases.md`):
 
 | Use case    | Sections specific to the use case                                                                                                                                                     |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

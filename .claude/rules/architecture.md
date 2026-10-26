@@ -50,7 +50,7 @@ The generated project is a **TypeScript / Node.js project of one of five use cas
 
 ### Composition root - `src/cli.ts` (CLI) · `src/index.ts` · `src/server.ts` · `src/extension.ts` · `src/main.tsx`
 - The **only** place that wires the layers together for its use case. CLI: the bin entry (shebang, bundled to `dist/cli.js` by tsup) that bootstraps `commander`, registers every command group, installs the global `uncaughtException`/`unhandledRejection` handlers, owns the exit-code mapping (`0`/`1`/`2`), and is the **only** place `process.exit` is called. Detail: `@rules/cli.md` · `@rules/errors.md`.
-- Library: `index.ts` is the public API barrel (explicit named exports, no side effect on import). Service: `server.ts` builds and starts the HTTP server, installs the global handlers, owns the startup/shutdown. Extension: `extension.ts` exports the host activation entry. Application: `main.tsx` mounts the React tree. Detail per use case: `@rules/use-cases.md`.
+- Library: `index.ts` is the public API barrel (explicit named exports, no side effect on import). Service: `server.ts` builds and starts the HTTP server, installs the global handlers, owns the startup/shutdown. Extension: `extension.ts` exports the host activation entry and installs no global process handler (the host owns the process). Application: `main.tsx` builds the services and the injected `Logger`, installs the `window` `error` / `unhandledrejection` listeners and mounts the React tree. Detail per use case: `@rules/use-cases.md`.
 
 ### Shared - `config.ts` · `logger.ts` · `progress.ts` (CLI only) · `types.ts` · `errors.ts`
 - `types.ts`: `Result<T>` (owned + quoted by `@rules/errors.md`) and the DTOs (with Salesforce: `OrgInfo`, `QueryResult`; always: `OutputFormat` for a CLI, ...). Zero logic.
@@ -114,7 +114,7 @@ Library:
 ```
 src/
 ├── index.ts                # public API barrel (named exports) - the only entry
-├── config.ts · types.ts · errors.ts  (logger.ts per @rules/use-cases.md)
+├── config.ts · types.ts · errors.ts  (no logger.ts: optional injected Logger)
 ├── services/               # business logic
 └── sf/                     # SALESFORCE ONLY
 ```
@@ -134,8 +134,8 @@ Extension:
 
 ```
 src/
-├── extension.ts            # activation entry (VS Code `main`, composition root)
-├── config.ts · types.ts · errors.ts
+├── extension.ts            # activation entry (VS Code `main`, composition root); no global process handler
+├── config.ts · types.ts · errors.ts   # no logger.ts: injected Logger over the host log channel
 ├── contributions/          # commands, views, handlers declared to the host
 ├── services/               # business logic
 └── sf/                     # SALESFORCE ONLY
@@ -147,8 +147,8 @@ Application (Vite + React, `@rules/ui.md`):
 
 ```
 src/
-├── main.tsx                # mounts the React tree
-├── config.ts · types.ts · errors.ts
+├── main.tsx                # composition root: services, injected Logger, window listeners, mount
+├── config.ts · types.ts · errors.ts   # no logger.ts
 ├── ui/                     # screens + components - @rules/ui.md
 ├── services/               # business logic (no DOM)
 └── sf/                     # SALESFORCE ONLY, requires a Node-side process (a browser bundle cannot spawn sf)
@@ -178,17 +178,17 @@ await program.parseAsync(process.argv);
 ```
 
 - The global handlers are installed **first** (before parsing) so a throw during a command never crashes silently or leaks a stack to stdout. The services need the resolved config at construction, so the global flags are read by a pre-parse before the real program is built. Composition is unidirectional: `SfRunner` -> `SfHelpers` -> services -> command groups. Full bootstrap (exit-code mapping, `exitOverride`, stdout/stderr discipline): `@rules/cli.md`.
-- The other composition roots follow the same order (global handlers first, bootstrap, composition, start): `@rules/use-cases.md`.
+- The service root follows the same order (global handlers first, bootstrap, composition, start). A library and an extension install no global process handler (the host owns the process); the application installs browser listeners in `main.tsx`: `@rules/use-cases.md`.
 
 ## Batch delivery
 
-Sizing is frozen after Phase 2 (`## CALIBRATION` in `CLAUDE.md`). The layered order ships the core (types/errors/config/`logger`/`progress`/`sf`/`output`) first, the business layers next, the composition root last. The tables below are written for the CLI; for another use case, swap `commands/` for its adapter layer, drop `output/`, `progress.ts` and the CLI-only items (`logger.ts` stays in the core where the use case imposes it), and ship its composition root where `cli.ts` ships.
+Sizing is frozen after Phase 2 (`## CALIBRATION` in `CLAUDE.md`). The layered order ships the core (types/errors/config/`logger`/`progress`/`sf`/`output`) first, the business layers next, the composition root last. The tables below are written for the CLI; for another use case, swap `commands/` for its adapter layer, drop `output/`, `progress.ts` and the CLI-only items (`logger.ts` stays in the core for a CLI tool and a service only), and ship its composition root where `cli.ts` ships.
 
 **Small project (3 batches):**
 
 | Batch | Content                                                                                                   |
 | ----- | --------------------------------------------------------------------------------------------------------- |
-| 1     | `src/types.ts` + `src/errors.ts` + `src/config.ts` + `src/logger.ts` + `src/progress.ts` (CLI) + `src/sf/` (Salesforce only: runner + helpers, `project.ts` if sfdx) + `src/output/` (CLI) |
+| 1     | `src/types.ts` + `src/errors.ts` + `src/config.ts` + `src/logger.ts` (CLI, service) + `src/progress.ts` (CLI) + `src/sf/` (Salesforce only: runner + helpers, `project.ts` if sfdx) + `src/output/` (CLI) |
 | 2     | `src/services/` + adapter layer (CLI: `src/commands/`, Salesforce starter `org.ts`, `data.ts`)             |
 | 3     | composition root (`src/cli.ts`) + root configs (`tsconfig.json`, `tsup.config.ts`, `eslint.config.mjs`, `.prettierrc`, `.prettierignore`, `.env.example`, `.gitignore`, `.yarnrc.yml`) + `package.json` + README + `CLAUDE.md` + `.claude/settings.json` + install instructions |
 
@@ -196,7 +196,7 @@ Sizing is frozen after Phase 2 (`## CALIBRATION` in `CLAUDE.md`). The layered or
 
 | Batch | Content                                                                                                   |
 | ----- | --------------------------------------------------------------------------------------------------------- |
-| 1     | `src/types.ts` + `src/errors.ts` + `src/config.ts` + `src/logger.ts` + `src/progress.ts` (CLI) + `src/sf/` (Salesforce only) + `src/output/` (CLI) |
+| 1     | `src/types.ts` + `src/errors.ts` + `src/config.ts` + `src/logger.ts` (CLI, service) + `src/progress.ts` (CLI) + `src/sf/` (Salesforce only) + `src/output/` (CLI) |
 | 2     | `src/services/`                                                                                            |
 | 3     | adapter layer (CLI: `src/commands/`)                                                                       |
 | 4     | composition root + root configs (incl. `.yarnrc.yml`, `.prettierignore`) + `package.json` + README + `CLAUDE.md` + `.claude/settings.json` + install instructions |
@@ -210,7 +210,7 @@ Add a final dedicated batch - `test/` (mirroring `src/`) + `vitest.config.ts` + 
 - Announcement: `Batch N/[total] - [content]`.
 - Files written directly to disk, complete and self-contained blocks.
 - Automatic chaining between batches without confirmation.
-- Last batch: install/run instructions (`yarn install`, `yarn dev`, `yarn typecheck`, `yarn lint`, `yarn build`) + the `sf` v2 prerequisite note when Salesforce is confirmed (`@rules/sf-cli.md`) + `README.md` at the root (`@rules/readme.md`).
+- Last batch: install/run instructions (`yarn install`, `yarn dev`, `yarn typecheck`, `yarn lint`, `yarn build`, and the advisory `yarn npm audit --recursive` - non-zero exit when advisories exist, not part of `@rules/verification.md §A`) + the `sf` v2 prerequisite note when Salesforce is confirmed (`@rules/sf-cli.md`) + `README.md` at the root (`@rules/readme.md`).
 
 ## Anti-patterns - what NOT to do
 

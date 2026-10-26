@@ -23,7 +23,7 @@ The status block (in the user's language).
 Show only (in the user's language):
 
 Phase: [name] | Batch: [X/total] | Next: [expected action]
-Locked decisions: [use case · Salesforce coupling (none | standalone | sfdx-project) · output formats and execution shape (CLI tool only) · tests · calibration]
+Locked decisions: [use case (+ host and webview for an extension) · Salesforce coupling (none | standalone | sfdx-project) · output formats and execution shape (CLI tool only) · UI choices (application, extension webview) · tests · distribution · calibration (provisional, then confirmed in Phase 2)]
 Open points: [list or "none"]
 
 For a delivered project (Phase 5 complete), add a version line when `docs/release/CHANGELOG.md` exists:

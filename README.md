@@ -12,7 +12,7 @@ Unified edition: the full generation pipeline **plus** post-delivery maintenance
 
 A structured prompt system that generates complete, production-ready TypeScript projects through a 5-phase cycle, then maintains them:
 
-1. **Scoping** - destination folder, project parameters, **use case** (CLI tool, library, service, extension, application; for an extension, the **host** is asked too, VS Code recommended), **Salesforce context** (detected from your objective: confirmed, absent, or asked when ambiguous), output formats and runtime interactivity (CLI only), tests. Each option comes with a plain-language consequence. Execution shape, distribution, and config strategy are stated framework defaults (overridable on request), not questions.
+1. **Scoping** - destination folder, project parameters, **use case** (CLI tool, library, service, extension, application; for an extension, the **host** is asked too, VS Code recommended), **Salesforce context** (detected from your objective: confirmed, absent, or asked when ambiguous), for an extension, whether it has a **webview**, output formats and runtime interactivity (CLI only), UI choices (application and webview), tests, and **distribution** (personal use or external publication; a library always ships to the npm registry and is not asked). Each option comes with a plain-language consequence. Execution shape and config strategy are stated framework defaults (overridable on request), not questions. A provisional calibration (size and number of batches) is announced at the end of Phase 1 and confirmed in Phase 2.
 2. **Featuring** - feature elicitation (commands for a CLI), MoSCoW prioritization, locked sizing.
 3. **Surfaces** - map each validated feature onto the interface of the use case: CLI commands (positional args, flags, input source, output format + destination, exit codes), public API of a library, endpoints of a service, contributions of an extension, screens of an application.
 4. **Architecture** - full file tree for the use case (and the Salesforce layer when confirmed), `Result<T>` + named errors, config keys - locked before any code is written.
@@ -32,13 +32,13 @@ Fixed in Phase 1, locked in the Phase 4 contract. Detail and selection guide: `r
 
 | Use case    | Entry point        | Typical output                      | Release channel (`rules/distribution.md`) |
 | ----------- | ------------------ | ----------------------------------- | ----------------------------------------- |
-| CLI tool    | `src/cli.ts`       | executable bin bundled by `tsup`    | npm registry, or local run (`yarn dev`, `node dist/cli.js`) |
-| Library     | `src/index.ts`     | importable package (ESM, types)     | npm registry                              |
-| Service     | `src/server.ts`    | long-running Node.js process        | run locally, or external target (opt-in)  |
-| Extension   | `src/extension.ts` | extension bundle for its host (VS Code recommended; host asked in Phase 1) | packaged artifact installed by hand (`.vsix` for VS Code), or host store (opt-in) |
-| Application | `src/main.tsx`     | web UI built by Vite (React)        | local build, or external target (opt-in)  |
+| CLI tool    | `src/cli.ts`       | executable bin bundled by `tsup`    | local run (`yarn dev`, `node dist/cli.js`) by default, npm registry (opt-in) |
+| Library     | `src/index.ts`     | importable package (ESM, types)     | npm registry (always, not asked)          |
+| Service     | `src/server.ts`    | long-running Node.js process        | run locally by default, or external target (opt-in) |
+| Extension   | `src/extension.ts` | extension bundle for its host (VS Code recommended; host asked in Phase 1) | packaged artifact installed by hand by default (`.vsix` for VS Code), or host store (opt-in) |
+| Application | `src/main.tsx`     | web UI built by Vite (React)        | local build by default, or external target (opt-in) |
 
-Common core for all five: `src/`, `test/` mirroring `src/`, shared files `config.ts`, `logger.ts` (where the use case imposes it), `types.ts`, `errors.ts`. Only the entry point and the layers above it change.
+Common core for all five: `src/`, `test/` mirroring `src/`, shared files `config.ts`, `logger.ts` (CLI tool and service only; the other use cases use an injected `Logger`), `types.ts`, `errors.ts`. Only the entry point and the layers above it change.
 
 ---
 
@@ -109,7 +109,7 @@ Then in Claude Code:
 | Command                    | Action                                                                |
 | -------------------------- | --------------------------------------------------------------------- |
 | `/yarn-app`                | Start menu (4 entry points incl. maintenance)                         |
-| `/yarn-p1-scoping`         | Scoping - use case, Salesforce context, output, tests, execution      |
+| `/yarn-p1-scoping`         | Scoping - use case, Salesforce context, output, tests, distribution   |
 | `/yarn-p2-featuring`       | Featuring - feature sheet + locked sizing                             |
 | `/yarn-p3-surfaces`        | Surfaces - the interface contract of the use case                     |
 | `/yarn-p4-architect`       | Architect - locked architecture contract                              |
@@ -145,7 +145,7 @@ mytool/
 ├── test/                          # Mirrors src/ (when tests are enabled)
 └── src/
     ├── cli.ts                     # bin entry: commander program, exit-code mapping (index.ts, server.ts, extension.ts or main.tsx for the other use cases)
-    ├── config.ts · logger.ts · progress.ts · types.ts · errors.ts   # shared - importable by all layers
+    ├── config.ts · logger.ts · progress.ts · types.ts · errors.ts   # shared - importable by all layers (logger.ts: CLI tool and service; progress.ts: CLI tool)
     ├── sf/                        # Salesforce only: runner.ts (cross-spawn) · helpers.ts · project.ts (sfdx mode)
     ├── services/                  # business logic - returns Result<T>
     ├── commands/                  # CLI only: thin adapters
@@ -158,7 +158,7 @@ A project without Salesforce has no `src/sf/` folder. A project with UI follows 
 
 ## Versioning & changelog
 
-Every generated project carries a SemVer version and a changelog at `docs/release/CHANGELOG.md` (Keep a Changelog format, written in English). Maintenance skills (`add-feature`, `fix-issue`, `refactor-code`) accumulate entries under `## [Unreleased]`; `/yarn-release` freezes them into a dated version block and bumps the version source (`package.json` version; `APP_VERSION` is derived from it, nothing to sync), then follows the release channel of the use case (`rules/distribution.md`). Distribution is personal by default; external publication is an opt-in choice made in Phase 1. The version is never bumped silently. See `rules/versioning.md`.
+Every generated project carries a SemVer version and a changelog at `docs/release/CHANGELOG.md` (Keep a Changelog format, written in English). Maintenance skills (`add-feature`, `fix-issue`, `refactor-code`) accumulate entries under `## [Unreleased]`; `/yarn-release` freezes them into a dated version block and bumps the version source (`package.json` version; `APP_VERSION` is derived from it, nothing to sync), then follows the release channel of the use case (`rules/distribution.md`). Distribution is personal by default (a library always ships to the npm registry); external publication is an opt-in choice made in Phase 1. The version is never bumped silently. See `rules/versioning.md`.
 
 The `CHANGELOG.md` at the root of this repository is the changelog of the generator itself, distinct from the `docs/release/CHANGELOG.md` of each generated project.
 

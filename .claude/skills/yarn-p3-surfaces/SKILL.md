@@ -28,7 +28,7 @@ Read `docs/specs/01-scoping.md` (use case, Salesforce context and coupling mode,
 | CLI tool | `@rules/cli.md`, `@rules/output.md`, `@rules/config.md` | 1.A |
 | Library | `@rules/use-cases.md`, `@rules/errors.md` | 1.B |
 | Service | `@rules/use-cases.md`, `@rules/errors.md`, `@rules/config.md`, `@rules/security.md` | 1.C |
-| Extension | `@rules/use-cases.md` (+ `@rules/ui.md` if it has a webview) | 1.D |
+| Extension | `@rules/use-cases.md` (+ `@rules/ui.md` if `webview = Yes` in `docs/specs/01-scoping.md`) | 1.D |
 | Application | `@rules/ui.md`, `@rules/use-cases.md` | 1.E |
 
 Based on the features validated in Phase 2, propose the surface of the use case (in the user's language). **Applies only when Salesforce coupling is confirmed in Phase 1**: the baseline `sf` features of the starter scaffold (org access, data query / export, and deploy / retrieve in `sfdx-project` mode, @rules/sf-cli.md) are always part of the surface; without coupling, none of them appears.
@@ -85,7 +85,7 @@ Then, for **each** command, a spec block (template below - repeat it for every c
 
 The four `sf` rows (`--target-org`, `--api-version`, `--page-size`, `--sf-cli-path`) exist **only when Salesforce coupling is confirmed**.
 
-- A global flag or config key that points to the tool's **own storage** (a data file, a config file chosen by the user, e.g. `--data-file`) is resolved with `path.resolve`, not confined under `exportDir`. State it in the spec as a **documented deviation** (reason: user-chosen storage path); paths *written* as exports (`-o`) stay confined (`@rules/security.md` section 3).
+- A global flag or config key that points to the project's **own storage** (a data file, a config file chosen by the user, e.g. `--data-file`) is resolved with `path.resolve`, not confined under `exportDir`. State it in the spec as a **documented deviation** (reason: user-chosen storage path); paths *written* as exports (`-o`) stay confined (`@rules/security.md` section 3).
 - `--help` / `--version` are **auto-provided** by commander - never re-specified. `--version` reads `APP_VERSION` from `config.ts`.
 - `--no-progress` disables the live progress display (steps/spinner on `stderr`); the display is auto-on when `stderr` is a TTY and off when piped / `CI` / debug logging - a runtime UI toggle, not a config-cascade key (`@rules/progress.md`).
 
@@ -141,7 +141,7 @@ For **each** endpoint:
 - **Auth**: none · token · other (never a secret in a file, `@rules/security.md`).
 - **Service called**: the `services/` function the handler delegates to (adapters stay thin).
 
-**Cross-cutting**: config fields (host, port, log level via `resolveConfig()`, `@rules/config.md`), request logging with `pino`, graceful shutdown, a global `uncaughtException` / `unhandledRejection` handler.
+**Cross-cutting**: config fields (host, port, log level via `resolveConfig()`, `@rules/config.md`), request logging with `pino`, graceful shutdown, a global `uncaughtException` / `unhandledRejection` handler (process entry, `@rules/errors.md`).
 
 ### 1.D Extension - contributions
 
@@ -154,10 +154,10 @@ The host is the one recorded in `docs/specs/01-scoping.md`. When host = VS Code:
 - **Activation**: the event(s) that start the extension and what `activate` does (and `deactivate`, if the host has one).
 - **Commands**: id · title · handler (the `services/` function it calls) · where it appears (palette, menu, shortcut).
 - **Settings**: key · type · default · description (user-facing, non-secret, `@rules/config.md`).
-- **Views / webview** (only if the extension has one): the UI follows `@rules/ui.md` (Vite + React) - list the screens as in 1.E.
+- **Views / webview** (only if `webview = Yes` in `docs/specs/01-scoping.md`; with `No`, state "no webview" and list native host surfaces only): the UI follows `@rules/ui.md` (Vite + React) - list the screens as in 1.E.
 - **Events**: the host events the extension listens to, and the handler of each.
 
-For **each** command, a block: purpose · input (prompt, selection, setting) · output (message, view update, file) · failure mapping (named error → host notification).
+For **each** command, a block: purpose · input (prompt, selection, setting) · output (message, view update, file) · failure mapping (named error → host notification). The extension installs no global process handler (the host owns the process): every command and event handler body is wrapped, logs through the injected `Logger` and reports through a generic host notification (`@rules/errors.md`).
 
 ### 1.E Application - screens and flows
 
@@ -182,7 +182,7 @@ For **each** screen:
 - **Data**: where it comes from (`services/`, local state), loading / empty / error states (named error → message).
 - **Navigation**: the screens it leads to.
 
-**Flows**: one numbered flow per validated v1.0 feature (start screen → steps → end state). Palette, design system, i18n and accessibility choices follow `@rules/ui.md`.
+**Flows**: one numbered flow per validated v1.0 feature (start screen → steps → end state). Styling, router, state and accessibility follow `@rules/ui.md` and the Phase 1 answers; no palette or design system is invented, and there is no i18n question.
 
 ## 2. Customization - questions via `AskUserQuestion`
 
@@ -208,7 +208,7 @@ Grouped confirmations (first call, ≤ 4 questions), by use case:
   2. **Activation event**: the recommended one for the validated features · another (**Other**).
 - **Application**
   1. **Screen map** - keep the proposed screens? `Keep as proposed (recommended)` · `Adjust` (**Other**).
-  2. **Navigation style**: the option recommended by `@rules/ui.md` · another (**Other**).
+  2. **Navigation style**: no router, `App.tsx` switches on a state value (recommended, `@rules/ui.md`) · a router validated in Phase 1 (only if one was selected) · another (**Other**).
 
 **CLI tool only** - per-command default format (next call(s), one question per data-producing command, batched ≤ 4 per call, split as needed): among the formats shipped (`table` · `json`, plus `csv` / `xlsx` only if selected in Phase 1). Recommend `table` for interactive reads, and `csv` / `xlsx` to a file for a query written out. (A bulk export uses the Bulk API - `csv` / `json` only, always to a file - not the `output/` formatters, so `xlsx` does not apply there.)
 

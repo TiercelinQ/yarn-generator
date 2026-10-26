@@ -23,7 +23,7 @@ The reporter is a **shared singleton** imported directly as `progress`, exactly 
 import { configureProgress } from "./progress";
 import { configureLogger, debugEnabled } from "./logger";
 
-const wantsDebug = debugEnabled()     // [TOOL]_DEBUG=1 (exported by logger.ts, @rules/logging.md)
+const wantsDebug = debugEnabled()     // [PROJECT]_DEBUG=1 (exported by logger.ts, @rules/logging.md)
   || config.logLevel === "debug" || config.logLevel === "trace";
 const progressEnabled =
   flags.progress                        // commander: `--no-progress` sets `progress` to false
@@ -44,7 +44,7 @@ configureProgress({ enabled: progressEnabled });
 
 - **Progress enabled (TTY)** → `cli.ts` raises the `pino` level to **`warn`** (via `configureLogger("warn")`), so the reporter owns the `info`-level narrative on `stderr`; warnings/errors still print. Trade-off: during an interactive progress run the **log file** also gets `warn+` for that run - acceptable, the operator is watching the live steps. Services still call `log.debug/info` as usual; those are simply gated out of `stderr` for the run.
 - **Progress disabled** → `pino` behaves exactly as today (`info` → file + `stderr`), and the reporter's `step`/`bar` completions emit `log.info` lines. Nothing changes for cron/CI.
-- **Debug requested** (`[TOOL]_DEBUG=1` or `--log-level debug`/`trace`) → progress is **auto-disabled** so a debugging run keeps full logs. The animation never hides diagnostics.
+- **Debug requested** (`[PROJECT]_DEBUG=1` or `--log-level debug`/`trace`) → progress is **auto-disabled** so a debugging run keeps full logs. The animation never hides diagnostics.
 
 ## Reference implementation - `src/progress.ts`
 

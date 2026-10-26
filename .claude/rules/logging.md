@@ -9,8 +9,8 @@
 | CLI tool    | `pino` (file + `stderr`), `src/logger.ts` as below. Mandatory.                                                                          |
 | Service     | `pino`, `src/logger.ts` as below. Mandatory. `configureLogger()` is called once in `server.ts`. The service runs locally by default, so the file and `stderr` sinks apply; an external target, if Phase 1 records one, may restrict the sink to process output. |
 | Library     | **No logging dependency imposed.** The library never configures a global logger and never writes to `stdout`/`stderr`. It accepts an **optional injected logger** (a minimal interface such as `{ debug, info, warn, error }`) and does nothing when none is given. |
-| Extension   | Use a **VS Code output channel** (a dedicated channel created at activation with the `vscode` API) through a thin wrapper in `src/logger.ts`. No `pino` file sink, no `console.log`. |
-| Application (UI) | **No `pino` in the browser.** `src/logger.ts` is a thin wrapper (levels `debug` / `info` / `warn` / `error`, `(object, message)` order kept for parity) over a swappable sink; **no `console.log` in delivered code** - the wrapper is the single place allowed to reach the sink, and `debug` is off in a production build (`@rules/ui.md`). |
+| Extension   | **No `src/logger.ts`, no `pino`.** Services receive the **injected `Logger`** (`types.ts`, same interface as the library); `extension.ts` implements it over a dedicated log channel created at activation (VS Code: `createOutputChannel(name, { log: true })`, pushed into `context.subscriptions`). No `console.log`. |
+| Application (UI) | **No `pino` in the browser, no `src/logger.ts`.** Services receive the **injected `Logger`** (`types.ts`), built once in `main.tsx` (levels `debug` / `info` / `warn` / `error`, `(object, message)` order kept for parity) over a swappable sink; **no `console.log` in delivered code** - that factory is the single place allowed to reach the sink, and `debug` is off in a production build (`@rules/ui.md`). |
 
 > The Extension row assumes host = VS Code (chosen in Phase 1). Another host follows the same boundary with its own notification and log mechanism.
 
@@ -36,23 +36,36 @@ export function createClient(opts: ClientOptions = {}): Client {
 }
 ```
 
-### Application (UI): thin logger wrapper
+### Extension and application: injected Logger implemented at the composition root
 
 ```ts
-// src/logger.ts - browser: no pino, no console.log in delivered code. The sink is the single swappable point.
-type Level = "debug" | "info" | "warn" | "error";
-type Sink = (level: Level, obj: object, msg?: string) => void;
-
-let sink: Sink = () => {};                               // production default: silent
-export function setLogSink(next: Sink): void { sink = next; }
-
-export const log = {
-  debug: (obj: object, msg?: string): void => { if (import.meta.env.DEV) sink("debug", obj, msg); },
-  info:  (obj: object, msg?: string): void => sink("info", obj, msg),
-  warn:  (obj: object, msg?: string): void => sink("warn", obj, msg),
-  error: (obj: object, msg?: string): void => sink("error", obj, msg),
+// src/extension.ts (host = VS Code) - the services only see the Logger interface of types.ts.
+const channel = vscode.window.createOutputChannel("[Ext Name]", { log: true });
+context.subscriptions.push(channel);
+const logger: Logger = {
+  debug: (obj, msg) => channel.debug(msg ?? "", obj),
+  info: (obj, msg) => channel.info(msg ?? "", obj),
+  warn: (obj, msg) => channel.warn(msg ?? "", obj),
+  error: (obj, msg) => channel.error(msg ?? "", obj),
 };
 ```
+
+```ts
+// src/main.tsx - browser: no pino, no console.log in delivered code. The sink is the single swappable point.
+type Level = keyof Logger;
+type Sink = (level: Level, obj: object, msg?: string) => void;
+
+function createLogger(sink: Sink = () => {}): Logger {   // production default: silent
+  return {
+    debug: (obj, msg) => { if (import.meta.env.DEV) sink("debug", obj, msg); },
+    info: (obj, msg) => sink("info", obj, msg),
+    warn: (obj, msg) => sink("warn", obj, msg),
+    error: (obj, msg) => sink("error", obj, msg),
+  };
+}
+```
+
+The VS Code snippet is an example of the host mechanism: another host maps the same `Logger` onto its own log channel. `LogOutputChannel` and its `debug` / `info` / `warn` / `error` methods are VS Code API names, confirm them against the `vscode` generator framework before relying on them.
 
 ---
 
@@ -60,8 +73,8 @@ export const log = {
 
 - **`pino` (^10)** - mandatory runtime dependency in a generated CLI or service (fast structured JSON logger; Node has no stdlib equivalent with a file sink).
 - **pino writes to a log file AND to `stderr`** - `stdout` stays **data-only** (pipeable) in a CLI, per the CLI I/O contract (`@rules/cli.md`). A log line never reaches stdout in a CLI.
-- **`pino-pretty` (runtime dependency)** is the human-readable transport, enabled **only in dev** (`NODE_ENV !== "production"` or `[TOOL]_DEBUG=1`). Production writes raw JSON to stderr. It is a **runtime `dependency`** (not a devDependency): `logger.ts` imports it at module load, and **tsup bundles devDependencies** - a bundled `pino-pretty` breaks the ESM output with `Dynamic require of "tty" is not supported` (`@rules/config.md`).
-- Level comes from `config.logLevel` (the cascade, `@rules/config.md`); `[TOOL]_DEBUG=1` forces `debug`.
+- **`pino-pretty` (runtime dependency)** is the human-readable transport, enabled **only in dev** (`NODE_ENV !== "production"` or `[PROJECT]_DEBUG=1`). Production writes raw JSON to stderr. It is a **runtime `dependency`** (not a devDependency): `logger.ts` imports it at module load, and **tsup bundles devDependencies** - a bundled `pino-pretty` breaks the ESM output with `Dynamic require of "tty" is not supported` (`@rules/config.md`).
+- Level comes from `config.logLevel` (the cascade, `@rules/config.md`); `[PROJECT]_DEBUG=1` forces `debug`.
 - When the **progress reporter** is active (CLI only), `cli.ts` raises the `stderr` level to `warn` (the reporter owns the `info` narrative); debug logging auto-disables the reporter - see "Coexistence with the progress reporter" below and `@rules/progress.md`.
 - **Zero `console.log` / `console.error`** in delivered code - only `log.*`.
 - **Never log a token, secret, password, session id, or PII** (`@rules/security.md`).
@@ -84,7 +97,7 @@ import { APP_NAME } from "./config";
 // Service started from its project directory: resolve(process.cwd(), "logs", "app.log") instead (gitignored, @rules/security.md).
 const LOG_FILE = join(homedir(), `.${APP_NAME}`, "logs", "app.log");
 
-/** e.g. tool `my-export` → env var `MY_EXPORT_DEBUG`. Non-alphanumerics normalized so the name is shell-usable. Exported: cli.ts reads it to gate the progress reporter. */
+/** e.g. project `my-export` → env var `MY_EXPORT_DEBUG`. Non-alphanumerics normalized so the name is shell-usable. Exported: cli.ts reads it to gate the progress reporter. */
 export function debugEnabled(): boolean {
   const key = `${APP_NAME.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_DEBUG`;
   return process.env[key] === "1";
@@ -112,13 +125,13 @@ export const log: Logger = pino(
 
 /** Apply the resolved config level (cascade defaults < .env < flags). Called once in the entry point after resolveConfig(). */
 export function configureLogger(level: LevelWithSilent): void {
-  log.level = debugEnabled() ? "debug" : level; // [TOOL]_DEBUG=1 forces debug regardless of config
+  log.level = debugEnabled() ? "debug" : level; // [PROJECT]_DEBUG=1 forces debug regardless of config
 }
 ```
 
 - **File + stderr, split by role.** **CLI**: the file is `~/.<tool>/logs/app.log` (user home, because a CLI runs from any folder; created on demand, outside any repo so nothing to gitignore). **Service** started from its project directory: `process.cwd()/logs/app.log`, gitignored (`@rules/security.md`). The sink uses `sync: true` so the last line is flushed even on `process.exit(1)`; stderr carries the same events for the operator. In a CLI, `stdout` is never a destination (`@rules/cli.md`). Keep the single-file-sink shape.
 - **`pino-pretty` is an inline stream on stderr, dev-only** - not a worker transport (`transport: { target: 'pino-pretty' }` spawns a worker; the inline stream is simpler and synchronous for a CLI). Prod stderr gets raw JSON.
-- **Level is the single gate.** The two multistream sinks are permissive (`trace`); the logger's own `level` decides what is emitted. `configureLogger()` sets it from `config.logLevel`, with `[TOOL]_DEBUG=1` forcing `debug`.
+- **Level is the single gate.** The two multistream sinks are permissive (`trace`); the logger's own `level` decides what is emitted. `configureLogger()` sets it from `config.logLevel`, with `[PROJECT]_DEBUG=1` forcing `debug`.
 - `APP_NAME` (used for the debug env var) lives in `config.ts` (`@rules/config.md`).
 
 ---
@@ -179,7 +192,7 @@ process.on("uncaughtException", (err) => { log.error({ err }, "uncaughtException
 process.on("unhandledRejection", (reason) => { log.error({ err: reason }, "unhandledRejection"); process.exit(1); });
 
 const config = resolveConfig(flags);     // flags = the pre-parse result, never program.opts() before parseAsync
-configureLogger(config.logLevel);        // apply the cascade level ([TOOL]_DEBUG=1 forces debug)
+configureLogger(config.logLevel);        // apply the cascade level ([PROJECT]_DEBUG=1 forces debug)
 log.info({ tool: APP_NAME }, "Starting");
 ```
 
@@ -193,13 +206,13 @@ log.info({ tool: APP_NAME }, "Starting");
 `src/progress.ts` also writes to `stderr` (`@rules/progress.md`). To keep log lines from garbling the live animation:
 - **Progress active (TTY)** - `cli.ts` raises the `pino` level to **`warn`** (`configureLogger("warn")`); the reporter carries the `info` narrative on `stderr`. Warnings/errors still print. The **log file** gets `warn+` for that run - an accepted trade-off (the operator is watching the live steps).
 - **Progress disabled** (piped / cron / `CI` / `--no-progress`) - `pino` behaves exactly as documented above (`info` → file + `stderr`); the reporter degrades to `log.info` / `log.warn` lines (the enriched-logs view).
-- **Debug logging** (`[TOOL]_DEBUG=1` or `--log-level debug` / `trace`) - the reporter is **auto-disabled** so a debugging run keeps full logs; the animation never hides diagnostics.
+- **Debug logging** (`[PROJECT]_DEBUG=1` or `--log-level debug` / `trace`) - the reporter is **auto-disabled** so a debugging run keeps full logs; the animation never hides diagnostics.
 
 ---
 
 ## Anti-patterns - what NOT to do
 
-- **Do not** use `console.log` / `console.error` in delivered code - only `log.*` (CLI, service, application wrapper) or the host output channel (extension).
+- **Do not** use `console.log` / `console.error` in delivered code - only `log.*` (CLI, service) or the injected `Logger` (library, extension over the host output channel, application).
 - **Do not** write a log line to `stdout` in a CLI - stdout is **data only**; pino goes to the file + stderr (`@rules/cli.md`).
 - **Do not** emit progress via `console.*` - the progress reporter (`src/progress.ts`) is the only sanctioned direct-`stderr` writer besides `pino` (`@rules/progress.md`).
 - **Do not** log a token, secret, password, session id, or PII (`@rules/security.md`).
@@ -207,10 +220,10 @@ log.info({ tool: APP_NAME }, "Starting");
 - **Do not** silence a non-re-throwing `catch` without `log.error({ err }, ...)`.
 - **Do not** put the message before the context object - pino is `(mergingObject, message)`: `log.info({ count }, "…")`.
 - **Do not** spin up a `pino-pretty` worker transport in prod - pretty is dev-only, inline on stderr; prod stderr is raw JSON.
-- **Do not** forget the global `uncaughtException` / `unhandledRejection` handlers in `cli.ts` and `server.ts` - both are mandatory (`@rules/errors.md`).
-- **Do not** add `pino` (or any logging dependency) to a library or to the browser bundle of an application - a library accepts an injected logger, the UI uses the thin wrapper.
+- **Do not** forget the global `uncaughtException` / `unhandledRejection` handlers in `cli.ts` and `server.ts` - both are mandatory (`@rules/errors.md`). A library and an extension install none.
+- **Do not** add `pino` (or any logging dependency) to a library or to the browser bundle of an application - a library accepts an injected logger, the application injects one implemented in `main.tsx`.
 - **Do not** let a library create a global logger or write to `stdout`/`stderr` on its own.
 
 ## Integrity verification
 
-Detailed in `@rules/verification.md`. Key points: CLI and service: `src/logger.ts` is the single setup point (pino → file + stderr, `configureLogger()` called once in the entry point); library: no logging dependency, optional injected logger; extension: host output channel; application: thin wrapper, no `pino` in the browser; zero `console.log` / `console.error` in delivered code and stdout never a log destination in a CLI; pino call order `(object, message)`; `pino` and `pino-pretty` both runtime `dependencies` where used (pretty dev-only, inline on stderr); no token, secret, or PII logged; in a CLI the level is raised to `warn` while the progress reporter is active and `[TOOL]_DEBUG=1` forces `debug`. Run silently; report only on a discrepancy.
+Detailed in `@rules/verification.md`. Key points: CLI and service: `src/logger.ts` is the single setup point (pino → file + stderr, `configureLogger()` called once in the entry point); library: no logging dependency, optional injected logger; extension and application: no `src/logger.ts`, injected `Logger` implemented in `extension.ts` (host output channel) and `main.tsx`, no `pino` in the browser; zero `console.log` / `console.error` in delivered code and stdout never a log destination in a CLI; pino call order `(object, message)`; `pino` and `pino-pretty` both runtime `dependencies` where used (pretty dev-only, inline on stderr); no token, secret, or PII logged; in a CLI the level is raised to `warn` while the progress reporter is active and `[PROJECT]_DEBUG=1` forces `debug`. Run silently; report only on a discrepancy.
