@@ -56,6 +56,7 @@ Mark a `(recommended)` option for each closed question, inferred from the existi
 
 Decide before writing anything:
 - **In-contract** - a unit within an existing group, a new non-secret config key, a new dataset routed through the existing output layer (CLI), and, when Salesforce is confirmed, a new typed helper whose command/flags are verified against `salesforce-cli-reference/`. Proceed to the diff as a straightforward addition.
+- **Guided assistant (CLI tool)** - when the project's Execution modes = `Flags + guided assistant` (read it in `docs/specs/01-scoping.md`), a new command also declares in the diff whether it gets an assistant (`src/prompts/<group>.prompts.ts`: the question table and the equivalent flag of each question, `@rules/cli.md`) and whether it is a flow (a flow service composing step services). With `Flags only`, adding an assistant is a **deviation** (new dependency `@clack/prompts`, new `src/prompts/`): declare it and wait for validation.
 - **Deviation** - a new domain beyond `service + adapter group`, a new dependency, a new coupling-mode behavior, a spawn outside the runner (Salesforce only), a second file for one domain, a layer not planned for the use case, or anything the locked contract does not cover. **STOP → declare the deviation in the diff, explain why → wait for validation before writing.** Never exceed the contract silently. **The diff + validation IS the protocol.**
 
 ## Step 3 - Architectural contract diff
@@ -74,7 +75,7 @@ Produce (in the user's language):
 [helper signature + the exact `sf` command/flags + the `salesforce-cli-reference/` topic file that verifies them - never invented]
 
 ### New surface
-[by use case: CLI subcommand name, args/flags, `--format` / `--output`, exit codes 0/1/2 · library export signature · service endpoint (method, path, status codes) · extension contribution (id, activation) · application screen (route, states)]
+[by use case: CLI subcommand name, args/flags, `--format` / `--output`, exit codes 0/1/2 (with the guided assistant: its question table and, for a flow, its steps and `--only` / `--skip` / `--dry-run`) · library export signature · service endpoint (method, path, status codes) · extension contribution (id, activation) · application screen (route, states)]
 
 ### Created test files (if Q4 = Yes)
 [mirror list under `test/`]

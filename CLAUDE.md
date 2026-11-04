@@ -2,7 +2,7 @@
 
 > Senior Node.js / TypeScript / Yarn Berry expert. Generates TypeScript projects for five use cases: CLI tool, library, service, extension, application (with UI). Salesforce coupling is optional and detected in Phase 1. Layered architecture with one composition root per use case.
 > Do not explain general programming concepts. Explain only the Node.js / TypeScript / Yarn Berry specifics that deviate from what a generic senior developer would expect.
-> Framework version: 1.0.1. This version is recorded in each generated project's `CLAUDE.md`.
+> Framework version: 1.1.0. This version is recorded in each generated project's `CLAUDE.md`.
 
 ---
 
@@ -138,6 +138,7 @@ The generation pipeline writes a persisted spec file per phase into `docs/specs/
 | Secrets          | Never in a file                                                                                                                        |
 | Logging          | `pino` (file + `stderr`, `pino-pretty` in dev) for CLI and service; CLI log file in `~/.<tool>/logs/app.log`; injected `Logger` otherwise - see `rules/logging.md` |
 | Runtime feedback | Progress reporter on `stderr` - CLI use case only - see `rules/progress.md`                                                            |
+| Execution modes  | Flags (always) · guided assistant with `@clack/prompts` (opt-in, Phase 1) - CLI use case only - see `rules/cli.md`                     |
 | Output           | Formatters JSON · console table always; CSV (`csv-stringify`) · xlsx (`exceljs`) only if selected in Phase 1 - CLI use case only - see `rules/output.md` |
 | Error contract   | `Result<T>` + named errors + exit-code mapping at the CLI boundary - see `rules/errors.md`                                             |
 | Build            | `tsup` (Node bundle, shebang for a CLI) · `tsx` (dev) · `tsc --noEmit` (typecheck) · Vite for the browser UI                           |
@@ -160,6 +161,7 @@ The generation pipeline writes a persisted spec file per phase into `docs/specs/
 - **Output (CLI use case)** - every user-facing dataset goes through the `output/` formatters (`json` and `table` always; `csv` and `xlsx` only if selected in Phase 1) with an explicit destination (`stdout` | file). An empty dataset is a success (valid empty document, exit `0`). No ad-hoc `console.log(JSON.stringify(...))` in a command. See `rules/output.md`.
 - **Logging** - `src/logger.ts` (pino) mandatory for the CLI and service use cases; zero `console.log` in delivered code (only `log.*`); never log a token or secret. Library, extension and application have no `src/logger.ts`: they use an injected `Logger` (`rules/use-cases.md`). See `rules/logging.md`.
 - **Runtime feedback (CLI use case)** - a hand-rolled progress reporter (`src/progress.ts`: `step` always, `bar` only when an operation has a known total) shows the operations a command performs on **`stderr`**, **auto-on a TTY**, `--no-progress` to disable. See `rules/progress.md`.
+- **Execution modes (CLI use case)** - fixed in Phase 1: `Flags only` (one command with its arguments, or several lines in succession; nothing is ever asked) or `Flags + guided assistant` (the same flags, plus: no argument in a terminal starts a series of questions that runs one or several commands for the user). The assistant lives in `src/prompts/` behind a single `canPrompt()` guard (`stdin` and `stderr` TTY, no `CI`), writes to **`stderr`**, gives every question an equivalent flag, asks only the values still missing, and never runs outside a terminal (no argument there is a usage error, exit `2`). A flow is one command calling one flow service. Phase 2 marks the flows, Phase 3 fixes the questions. See `rules/cli.md`.
 - **UI (projects with UI)** - Vite + React + TypeScript strict; conventions in `rules/ui.md`.
 - If the coupling mode is `sfdx-project` (Phase 1): detect and read `sfdx-project.json`, respect `.forceignore`, and scope `sf project ...` commands to the project. See `rules/sfdx-project.md`.
 - If tests enabled in Phase 1: test suite mandatory (`vitest`) - see `rules/tests.md`.
@@ -241,4 +243,4 @@ Canonical source of the calibration. Skills refer to it - do not duplicate this 
 | Small          | < 10  | ≤ 5      | 3                  | 4                    |
 | Medium / Large | ≥ 10  | > 5      | 4                  | 5                    |
 
-The extra batch corresponds to the test suite + dev dependencies (see `rules/tests.md`). Divergent criteria (e.g. < 10 files but > 5 features): the highest criterion wins → Medium/Large. The core ships in **Batch 1**: `types`, `errors`, `config`, `logger.ts` (CLI tool, service) and (CLI) `progress.ts` (services import them from Batch 2), `output/` (CLI), and the Salesforce `sf` runner and helpers when coupled (no dedicated batch). The composition root (entry point) ships in the last batch, with the root configs (including `.prettierignore`), `package.json`, README, `CLAUDE.md`, `.claude/settings.json`, the changelog seed and session S0. The `output/` formatters (CLI), the Salesforce `sf/` layer, and the UI each add files and push the size up.
+The extra batch corresponds to the test suite + dev dependencies (see `rules/tests.md`). Divergent criteria (e.g. < 10 files but > 5 features): the highest criterion wins → Medium/Large. The core ships in **Batch 1**: `types`, `errors`, `config`, `logger.ts` (CLI tool, service) and (CLI) `progress.ts` (services import them from Batch 2), `output/` (CLI), and the Salesforce `sf` runner and helpers when coupled (no dedicated batch). The composition root (entry point) ships in the last batch, with the root configs (including `.prettierignore`), `package.json`, README, `CLAUDE.md`, `.claude/settings.json`, the changelog seed and session S0. The `output/` formatters (CLI), the CLI guided assistant (`src/prompts/` files and flow services), the Salesforce `sf/` layer, and the UI each add files and push the size up.

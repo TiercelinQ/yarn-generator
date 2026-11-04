@@ -4,6 +4,18 @@ All notable changes to this generator are documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 (This is the changelog of the **generator** itself, distinct from the `docs/release/CHANGELOG.md` of each generated project.)
 
+## [1.1.0] - 2026-11-04
+
+### Added
+- Phase 1 asks **Execution modes** (`Flags only` | `Flags + guided assistant`) in place of the former "Runtime interactivity" question, for the CLI tool only (same place, same question count). The recommendation comes from the objective, not from a fixed default. With the assistant, the generated tool started with no argument in a terminal asks a series of questions and runs one or several commands; with flags given, it asks only the missing values (hybrid).
+- Phase 2 Step 4b "Execution flows" (CLI tool with the assistant): which v1.0 commands are multi-step flows, their ordered steps, step selection, repeat, dry run. The synthesis sheet gains an "Execution flows" table.
+- Phase 3 specifies, per command, the assistant's question table (type, default, validation, equivalent flag, required outside a terminal) and, per flow, `--only` / `--skip` / `--dry-run`, the failure rule, and the global `--yes` flag. Phase 3 questions 4 and 5 choose the commands with an assistant and the destructive ones that confirm first.
+- `rules/cli.md` section "Execution modes": entry rules (terminal or not), single `canPrompt()` guard in `src/prompts/guard.ts`, prompts on `stderr`, equivalent command line printed at the end, cancel handling, flows. `rules/architecture.md`: `src/prompts/` layer and the documented flow-service exception. Matching updates in `use-cases`, `config`, `tests`, `verification`, `security`, `readme` and the Phase 4/5, add-feature, generate-readme, show-state and save-session skills.
+
+### Changed
+- The "Non-interactive by default" section of `rules/cli.md` becomes "Execution modes", which keeps the existing guard (`stdin` and `stderr` TTY, never `stdout`; prompts written to `stderr`) and now adds `CI` to it, behind a single `canPrompt()` function.
+- A destructive command without `--yes` outside a terminal is still refused with a `ValidationError` (exit `2`); the sample now goes through `canPrompt()`.
+
 ## [1.0.1] - 2026-10-26
 
 ### Fixed

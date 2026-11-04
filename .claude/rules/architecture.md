@@ -24,6 +24,7 @@ The generated project is a **TypeScript / Node.js project of one of five use cas
 | Services         | `src/services/`     | Business logic - orchestrates `sf/` (if any), shapes DTOs, returns `Result<T>` |
 | Salesforce       | `src/sf/`           | **Salesforce only.** Process execution - `cross-spawn` `sf ...`, defensive parse - `@rules/sf-cli.md` |
 | Output           | `src/output/`       | **CLI only.** Formatters - `json` · `table` always, `csv` · `xlsx` only when selected in Phase 1 -> stdout / file - `@rules/output.md` |
+| Prompts          | `src/prompts/`      | **CLI guided assistant only.** Adapters that ask the missing values on `stderr` -> typed `Result<Input>`; `guard.ts` decides if a question may be asked - `@rules/cli.md` |
 | Composition root | `src/cli.ts` · `src/index.ts` · `src/server.ts` · `src/extension.ts` · `src/main.tsx` | One per use case. CLI: `commander` bootstrap, registers commands, maps `Result`/errors -> exit code - `@rules/cli.md` |
 | Shared           | `src/config.ts`, `src/logger.ts`, `src/progress.ts` (CLI only), `src/types.ts`, `src/errors.ts` | Defaults, `pino` (where imposed), progress reporter, `Result<T>` + DTOs, named errors - importable by all |
 
@@ -38,6 +39,7 @@ The generated project is a **TypeScript / Node.js project of one of five use cas
 ### Services - `src/services/`
 - One file per domain: `<domain>.service.ts`. Pure Node + TypeScript business logic. A class (or functions) that, with Salesforce coupling, receives the injected `SfHelpers` (`@rules/sf-cli.md`), orchestrates them, applies the domain rules, and returns `Result<T>` (or raises a named error from `src/errors.ts`).
 - **Forbidden**: importing `commander`, touching `process.exit` / `process.argv` / `process.stdout`, and formatting output. A service returns typed DTOs; the adapter formats them. Tolerated: importing `sf/` (if any), `config`, `logger`, `progress` (CLI), `types`, `errors`.
+- **Flow service (CLI guided assistant only)**: `<flow>.service.ts` is the one documented exception to "a service depends on `sf/` (if any), `config`, `logger`, `progress`, `types`, `errors` only": it receives the **step services by injection** (constructor, built in `cli.ts`), runs them in order, and returns a `Result` that lists the steps done. It never imports a prompts file, `commander`, or `output/`. A flow is one command calling this one service (`@rules/cli.md`).
 
 ### Salesforce - `src/sf/` (Salesforce coupling only)
 - `runner.ts`: the `SfRunner` class - the single `sf` entry point and the **only place the whole project spawns a process**. `run<T>(args)` calls `cross-spawn(bin, [...args, "--json"])`, parses the envelope defensively, and returns `Result<T>` (mapping `ENOENT`/non-zero status to a `Result` error, or a named `SfCliNotFoundError`/`SfCommandError` where a caller prefers to raise). Never a concatenated shell string, never `node:child_process` directly. `helpers.ts`: the `SfHelpers` class - typed helpers (`listOrgs`, `query`, ...) on top of the runner, each `argv` **verified against `salesforce-cli-reference/`**, never invented; injected into the services. `project.ts`: `sfdx-project` mode only - `@rules/sfdx-project.md`.
@@ -47,6 +49,10 @@ The generated project is a **TypeScript / Node.js project of one of five use cas
 ### Output - `src/output/` (CLI use case only)
 - `index.ts` dispatches on the chosen format to the shipped formatters: `json.ts` · `table.ts` always, `csv.ts` · `xlsx.ts` only when selected in the Phase 1 "Output formats" question (an unknown format is a `ValidationError`, exit `2`), writing to an explicit destination (`stdout` | a file path). Every user-facing dataset goes through here - no ad-hoc `console.log(JSON.stringify(...))` in a command.
 - **Forbidden**: any `sf`/business dependency. `output/` imports only `types` (the DTOs it renders). It is a pure presentation layer. Detail: `@rules/output.md`.
+
+### Prompts - `src/prompts/` (CLI use case, guided assistant only)
+- Present **only** when Phase 1 Execution modes = `Flags + guided assistant` (CLI tool). `guard.ts` exports `canPrompt()` (the single decision: `stdin` and `stderr` TTY, no `CI`). `<group>.prompts.ts` holds one function per assistant: it asks the values still missing on `stderr` and returns `Promise<Result<Input>>`. Full rules and samples: `@rules/cli.md`.
+- **Forbidden**: business logic, a service call, an `sf` call, formatting, `process.exit`, reading `process.argv`. Imports allowed: `@clack/prompts`, `types`, `guard.ts`. A `commands/` file calls a prompts function; a prompts file never calls a command.
 
 ### Composition root - `src/cli.ts` (CLI) · `src/index.ts` · `src/server.ts` · `src/extension.ts` · `src/main.tsx`
 - The **only** place that wires the layers together for its use case. CLI: the bin entry (shebang, bundled to `dist/cli.js` by tsup) that bootstraps `commander`, registers every command group, installs the global `uncaughtException`/`unhandledRejection` handlers, owns the exit-code mapping (`0`/`1`/`2`), and is the **only** place `process.exit` is called. Detail: `@rules/cli.md` · `@rules/errors.md`.
@@ -65,7 +71,8 @@ The generated project is a **TypeScript / Node.js project of one of five use cas
 ```
 src/cli.ts  (composition root - the only commander bootstrap, the only process.exit)
    └─▶ commands/ ──▶ services/ ──▶ sf/          business logic -> process execution (sf/ only with Salesforce)
-              └───▶ output/                     commands format the returned data -> stdout / file (CLI only)
+              ├───▶ output/                     commands format the returned data -> stdout / file (CLI only)
+              └───▶ prompts/                    CLI guided assistant only: commands ask the missing values (prompts import only types + guard)
 
 config.ts · logger.ts · progress.ts · types.ts · errors.ts    ◀── importable by ALL layers (never import upward)
 ```
@@ -104,6 +111,7 @@ CLI tool (reference tree; the Salesforce lines apply only when coupling is confi
 │   │   └── project.ts      # sfdx-project mode - @rules/sfdx-project.md
 │   ├── services/           # <domain>.service.ts - business logic
 │   ├── commands/           # <group>.ts - thin adapters (Salesforce starter: org.ts, data.ts)
+│   ├── prompts/            # guided assistant only: guard.ts + <group>.prompts.ts - @rules/cli.md
 │   └── output/             # index.ts (dispatch) + json.ts + table.ts (+ csv.ts, xlsx.ts if selected) - @rules/output.md
 ├── scripts/                # standalone one-off scripts (if execution shape includes them)
 └── test/                   # vitest (if enabled), mirrors src/
@@ -156,6 +164,7 @@ src/
 
 - `project.ts` ships only in `sfdx-project` coupling mode (`@rules/sfdx-project.md`); in `standalone` mode `src/sf/` is `runner.ts` + `helpers.ts`.
 - `scripts/` exists only when the execution shape (Phase 3) includes standalone one-off scripts; `test/` only when tests were enabled in Phase 1.
+- `src/prompts/` (and the flow services in `src/services/`) exist only for a CLI tool with Execution modes = `Flags + guided assistant`; with `Flags only`, no `@clack/prompts` dependency and no prompts file. The other use cases never have them.
 - Root config files per use case (tsup vs Vite, `index.html` for an application): `@rules/config.md`.
 
 ## `cli.ts` composition sequence (non-negotiable, CLI use case only)
@@ -189,7 +198,7 @@ Sizing is frozen after Phase 2 (`## CALIBRATION` in `CLAUDE.md`). The layered or
 | Batch | Content                                                                                                   |
 | ----- | --------------------------------------------------------------------------------------------------------- |
 | 1     | `src/types.ts` + `src/errors.ts` + `src/config.ts` + `src/logger.ts` (CLI, service) + `src/progress.ts` (CLI) + `src/sf/` (Salesforce only: runner + helpers, `project.ts` if sfdx) + `src/output/` (CLI) |
-| 2     | `src/services/` + adapter layer (CLI: `src/commands/`, Salesforce starter `org.ts`, `data.ts`)             |
+| 2     | `src/services/` + adapter layer (CLI: `src/commands/`, Salesforce starter `org.ts`, `data.ts`; guided assistant only: `src/prompts/` and the flow services) |
 | 3     | composition root (`src/cli.ts`) + root configs (`tsconfig.json`, `tsup.config.ts`, `eslint.config.mjs`, `.prettierrc`, `.prettierignore`, `.env.example`, `.gitignore`, `.yarnrc.yml`) + `package.json` + README + `CLAUDE.md` + `.claude/settings.json` + install instructions |
 
 **Medium / Large project (4 batches):** split the business layers so each ships on its own (services are the core, the adapters wire them).
@@ -197,8 +206,8 @@ Sizing is frozen after Phase 2 (`## CALIBRATION` in `CLAUDE.md`). The layered or
 | Batch | Content                                                                                                   |
 | ----- | --------------------------------------------------------------------------------------------------------- |
 | 1     | `src/types.ts` + `src/errors.ts` + `src/config.ts` + `src/logger.ts` (CLI, service) + `src/progress.ts` (CLI) + `src/sf/` (Salesforce only) + `src/output/` (CLI) |
-| 2     | `src/services/`                                                                                            |
-| 3     | adapter layer (CLI: `src/commands/`)                                                                       |
+| 2     | `src/services/` (+ the flow services, CLI guided assistant only)                                           |
+| 3     | adapter layer (CLI: `src/commands/`, + `src/prompts/` for the guided assistant)                            |
 | 4     | composition root + root configs (incl. `.yarnrc.yml`, `.prettierignore`) + `package.json` + README + `CLAUDE.md` + `.claude/settings.json` + install instructions |
 
 > **Salesforce integration (only when coupling is confirmed)** - no dedicated batch. `src/sf/runner.ts` + `src/sf/helpers.ts` (the runner and the starter set of typed `sf`-command helpers) ship in **Batch 1** - they are the core the services build on. The starter CLI command group `commands/org.ts` (+ `data.ts`) and their thin services ship with the services/adapter batch (Batch 2 Small · Batch 2-3 Medium/Large). The coupling mode (`standalone` | `sfdx-project`), the CLI `output/` formatters, and the UI add files and push the size up. See `@rules/sf-cli.md` · `@rules/sfdx-project.md`.
@@ -221,7 +230,8 @@ Add a final dedicated batch - `test/` (mirroring `src/`) + `vitest.config.ts` + 
 - **Do not** skip a layer (an adapter reaching into `sf/`, a service formatting output) - the chain is `root -> adapters -> services -> sf`, with `commands -> output` for rendering in a CLI.
 - **Do not** (CLI) `console.log` a dataset - route every user-facing dataset through an `output/` formatter with an explicit destination (`@rules/output.md`).
 - **Do not** (CLI) emit a progress/status line to `stdout` or from `output/` - the progress reporter (`src/progress.ts`) writes to `stderr` only; a command brackets a file write with a `progress.step`, `output/` stays pure (`@rules/progress.md`).
-- **Do not** spread one domain across more files than `service + adapter group`. If it grows, that is a contract change -> declare the deviation (Phase 4 protocol).
+- **Do not** spread one domain across more files than `service + adapter group` (+ one `<group>.prompts.ts` for a CLI tool with the guided assistant). If it grows, that is a contract change -> declare the deviation (Phase 4 protocol).
+- **Do not** (CLI) put a prompt in a command, a service, or `output/`: questions live in `src/prompts/` behind `canPrompt()` (`@rules/cli.md`); **do not** let a service other than a documented flow service depend on another service.
 - **Do not** put a shared constant in a single layer - promote it to `config.ts`; a shared type to `types.ts`.
 - **Do not** (Salesforce) invent an `sf` command or flag from memory - verify against `salesforce-cli-reference/` (`@rules/sf-cli.md`).
 - **Do not** write an `npm`, `npx` or `pnpm` command anywhere - every command goes through `yarn` (`@rules/config.md`).

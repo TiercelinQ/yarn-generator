@@ -136,7 +136,7 @@ sf --version          # Salesforce CLI v2 (only if Salesforce coupling is confir
 
 Objective (free text), then project name + root (a single kebab-case name, used for the folder AND for the `bin` of a CLI; location; creation), then the closed parameters via `AskUserQuestion` (4 questions maximum per call, several calls if needed), each option carrying a one-line consequence:
 
-- **use case** (CLI tool / library / service / extension / application; for an extension, the **host**, VS Code recommended, and whether it has a **webview**) · **Salesforce context** (per the three cases above; if confirmed: `standalone` / `sfdx-project` mode, and folder path if `sfdx-project`) · tests (`vitest`) · **distribution** (personal use, or external publication with a target; a library always ships to the npm registry and is not asked) · for a CLI: output formats (JSON + table, plus CSV / xlsx if wanted: only the selected formats ship) and interactivity (non-interactive / prompts) · for an application or an extension webview: styling approach and UI libraries.
+- **use case** (CLI tool / library / service / extension / application; for an extension, the **host**, VS Code recommended, and whether it has a **webview**) · **Salesforce context** (per the three cases above; if confirmed: `standalone` / `sfdx-project` mode, and folder path if `sfdx-project`) · tests (`vitest`) · **distribution** (personal use, or external publication with a target; a library always ships to the npm registry and is not asked) · for a CLI: output formats (JSON + table, plus CSV / xlsx if wanted: only the selected formats ship) and execution modes (flags only / flags + guided assistant; the recommendation comes from the objective: work with several successive inputs such as picking a file or a target, confirming, a dry run before the real run or repeating on several items recommends the assistant, scheduled work or a single input recommends flags only) · for an application or an extension webview: styling approach and UI libraries.
 
 Framework defaults not asked: strict TypeScript + ESM, Yarn Berry, `tsup` build (Node) or Vite (UI), `commander` parser and progress reporter (CLI only), `pino` logger (CLI and service; the other use cases use an injected `Logger`). **Project shape defaults, overridden on request only**: execution shape, config strategy = cascade `config.ts < .env < flags`. Salesforce/SFDX detection on the objective: `deploy`/`retrieve`/`source`/`sfdx-project` recommends `sfdx-project`, otherwise `standalone`.
 
@@ -151,7 +151,7 @@ Writes `docs/specs/01-scoping.md`.
 
 ### Phase 2 - Featuring
 
-Name confirmation (from Phase 1, adjustable only if the `bin` must differ from the folder for a CLI). Elicitation of the **features** (commands for a CLI), MoSCoW, v1.0 scope. Calibration confirmed here from the v1.0 feature count (it refines the Phase 1 provisional announcement and is locked with the features validation, not a separate confirmation step). Blocking validation on the features / scope. Writes `docs/specs/02-featuring.md`.
+Name confirmation (from Phase 1, adjustable only if the `bin` must differ from the folder for a CLI). Elicitation of the **features** (commands for a CLI), MoSCoW, v1.0 scope. For a CLI with the guided assistant: an "execution flows" step (which commands chain several steps, ordered steps, step selection, repeat, dry run). Calibration confirmed here from the v1.0 feature count (it refines the Phase 1 provisional announcement and is locked with the features validation, not a separate confirmation step). Blocking validation on the features / scope. Writes `docs/specs/02-featuring.md`.
 
 ### Phase 3 - Surfaces
 
@@ -159,7 +159,7 @@ Each validated feature is mapped onto the use case interface. Blocking validatio
 
 | Use case | Described surface |
 | -------- | ----------------- |
-| CLI tool | For each command: full name (`group verb`), positional args, flags/options (type, default, required), input source, output format + destination, exit conditions (0/1/2), interactive prompt (if enabled). Global flags (`--format`, `--output`, `--log-level`, ... ; `--target-org` if Salesforce). |
+| CLI tool | For each command: full name (`group verb`), positional args, flags/options (type, default, required), input source, output format + destination, exit conditions (0/1/2), execution modes (with the assistant: question table, one row per question with its equivalent flag; for a flow: steps, `--only` / `--skip` / `--dry-run`). Global flags (`--format`, `--output`, `--log-level`, ... ; `--yes` with the assistant; `--target-org` if Salesforce). |
 | Library | Public API: exports, signatures, types, errors. |
 | Service | Endpoints: routes, inputs, outputs, error codes. |
 | Extension | Contributions: commands, views, settings, activation events. Host: asked in Phase 1 (VS Code recommended; host-specific rules for VS Code: the dedicated `vscode` generator framework; another host gets only the common core plus what the user supplies). |
@@ -287,6 +287,7 @@ mon-projet/
     ├── sf/                        # Salesforce only: runner.ts (cross-spawn) · helpers.ts · project.ts (sfdx mode)
     ├── services/                  # business logic - returns Result<T>
     ├── commands/                  # CLI only: thin adapters
+    ├── prompts/                   # CLI with the guided assistant only: guard.ts · <group>.prompts.ts
     └── output/                    # CLI only: index.ts (dispatch) · json.ts · table.ts (+ csv.ts · xlsx.ts if selected)
 ```
 
@@ -305,6 +306,7 @@ Each generated project carries a SemVer version and a changelog `docs/release/CH
 - Salesforce is **optional**: detection in Phase 1 (clear / absent / ambiguous, hence a question). Once confirmed: `sf` v2 only, never legacy `sfdx`, every call through `src/sf/runner.ts` (cross-spawn, args array), commands checked in `salesforce-cli-reference/`.
 - CLI: `stdout` = data only (pipeable), `stderr` = logs + messages. `pino` never writes to stdout. Exit codes mapped once at the `cli.ts` boundary (0/1/2), never hardcoded elsewhere.
 - CLI: the progress reporter (`src/progress.ts`, `step` always, `bar` only for a known total) shows steps on `stderr`, auto-enabled in a terminal (TTY), silent in pipe/cron/CI; `--no-progress` turns it off. `stdout` stays data.
+- CLI execution modes: flags stay the contract of scripts. With the guided assistant, launched with no argument in a terminal the tool asks the questions then runs one or several commands; with some flags it asks only the missing values; outside a terminal it never asks (no argument = usage error, exit 2). Questions go to `stderr`, each has an equivalent flag, and the equivalent command line is printed at the end. A flow accepts `--only` / `--skip` / `--dry-run` according to its spec.
 - The contract (`docs/specs/04-architect.md`) is locked. Any structural change goes through `/yarn-add-feature` or the deviation declaration protocol.
 - No secret in a file: with Salesforce, `sf` holds the tokens in the OS keychain; the project stores only a non-secret alias.
 - `/yarn-load-project`, `/yarn-generate-readme` and the maintenance skills are invoked from the root of the target project.

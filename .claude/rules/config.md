@@ -397,7 +397,7 @@ export default defineConfig({
 The sample is the CLI with Salesforce. Keep per use case only what the contract needs: `commander` (CLI only), `cross-spawn` + `@types/cross-spawn` (Salesforce only), `exceljs` (only when the `xlsx` format is selected) and `csv-stringify` (only when `csv` is selected) - `json` and `table` need no dependency, `pino` + `pino-pretty` (CLI and service; other use cases per `@rules/logging.md`).
 
 Conditional (added only when the matching Phase 1 option is on):
-- **Interactive prompts** (opt-in, CLI): `@clack/prompts ^1.7.0` in `dependencies`. Not added by default - a headless CLI takes its input from flags/env, and prompts must be guarded against a non-TTY / `--yes` run (`@rules/cli.md`).
+- **Guided assistant** (CLI, Execution modes = `Flags + guided assistant`): `@clack/prompts ^1.7.0` in `dependencies`. Not added with `Flags only` - a headless CLI takes its input from flags/env, and every prompt goes through the `canPrompt()` guard, on `stderr`, never under `CI` or `--yes` (`@rules/cli.md`).
 - **Tests** (Phase 1): `vitest ^5.0.3` in `devDependencies` + the `"test": "vitest run"` script (`@rules/tests.md`).
 - **UI** (projects with UI only): `vite ^8.3.4` and `@vitejs/plugin-react ^6.1.2` in `devDependencies`; `react ^19.3.0` and `react-dom ^19.3.0` in `dependencies`, with `@types/react ^19.3.0` and `@types/react-dom ^19.3.0` in `devDependencies`; with tests, `jsdom ^30.1.2`, `@testing-library/react ^16.3.3` and its peer `@testing-library/dom ^10.4.2` in `devDependencies`. `@vitejs/plugin-react` 6 requires `vite ^8`. Re-confirm at generation with `yarn npm info <package>` (`yarn-npm-info.md`).
 

@@ -21,7 +21,7 @@ Define, per feature, the exact interface contract of the use case: for a CLI too
 
 **Phase banner (show first)** - before anything else, output the phase banner as plain Markdown in the user's language, **never inside a code block or fenced block**. Three blocks, each on its own line: (1) H2 heading: Phase 3/5 - Surfaces; (2) progress line: Scoping ✓ · Features ✓ · ▶ Surfaces · Architecture · Development; (3) intent in italics: Map the validated features onto the interface of the use case. Use the label `Surfaces` in the progress map. See `## PIPELINE` in `CLAUDE.md`.
 
-Read `docs/specs/01-scoping.md` (use case, Salesforce context and coupling mode, use-case-specific parameters, tests) and `docs/specs/02-featuring.md` (the validated v1.0 features) for the decisions this phase builds on. **Read the rules of the use case first** (not auto-imported), then follow only the matching sub-section below:
+Read `docs/specs/01-scoping.md` (use case, Salesforce context and coupling mode, use-case-specific parameters, tests) and `docs/specs/02-featuring.md` (the validated v1.0 features and, for a CLI tool with the guided assistant, the execution flows) for the decisions this phase builds on. **Read the rules of the use case first** (not auto-imported), then follow only the matching sub-section below:
 
 | Use case | Rules to read | Sub-section |
 | -------- | ------------- | ----------- |
@@ -69,7 +69,14 @@ Then, for **each** command, a spec block (template below - repeat it for every c
 - **Input source**: flags (primary) · env/config (global settings) · stdin (piped input / NDJSON to import) · file (`--file`). State which the command reads.
 - **Output**: default `--format` = *(§2 choice)*; `-o, --output <file>` → file under `exportDir`, else `stdout` (data). `stderr` carries logs + human messages. If `xlsx` ships, it requires a file destination: the command rejects a missing `-o` with a `ValidationError` (exit `2`) before any work.
 - **Exit conditions** (`@rules/cli.md`): `0` success - **including an empty result set** of a command that returns a dataset (list, query, export): the formatter prints a valid empty document (json `[]`, table `(0 rows)`, csv header-only or empty, xlsx placeholder sheet), with an optional human note on `stderr`; `kind: "warning"` (non-fatal, stays `0`) is kept for non-dataset commands where nothing was done; `1` runtime failure (IO error, `sf` error when coupled, unexpected throw); `2` usage/validation (bad flag value, missing/invalid argument, unknown `--format`).
-- **Interactive prompt**: n/a - non-interactive (fully flag-driven). *(Only if interactivity was enabled in Phase 1:)* the guarded prompt + its safe default - never prompt when `stdin` or `stderr` is not a TTY (prompts are written to `stderr`, `stdout` stays data) or `--yes` is set; a non-TTY run without `--yes` takes the safe default (abort a destructive action). See `@rules/cli.md`.
+- **Execution modes**: `Flags only` - n/a, fully flag-driven, nothing is ever asked. *(Only if the guided assistant was enabled in Phase 1:)* the command's assistant, one row per question in asking order. Derive the questions from the command's own inputs (every required value and every choice the command needs), never from an example:
+
+  | # | Question (user's language) | Type | Default | Validation | Equivalent flag | Required outside a terminal |
+  | - | -------------------------- | ---- | ------- | ---------- | --------------- | --------------------------- |
+  | 1 | ...                        | text / select / confirm / multiselect | ... | ... | `--<flag>` | yes / no |
+
+  Entry rule (`@rules/cli.md`): no argument in a terminal runs the assistant; with flags given, only the missing values are asked (hybrid); no argument outside a terminal is a usage error (exit `2`, help shown), never a blocking prompt. Prompts are written to `stderr` (`stdout` stays data). The assistant ends by printing the equivalent command line on `stderr`. A destructive command asks for confirmation first (always guarded, `--yes` skips it).
+- **Flow** *(only if Phase 2 marked this command as a flow)*: the ordered steps (each step = one service it composes), `--only <steps>` / `--skip <steps>` when step selection is "all or some" (the assistant then opens with "everything, or choose the steps"), `--dry-run` when the flow has a dry-run step, a closing "another item?" question when it repeats, and the failure rule: the first failed step stops the flow, the steps already done are listed on `stderr`, exit `1`.
 
 **Global flags** (every command inherits - resolved once by `resolveConfig()`, cascade `defaults < .env < flags`, `@rules/config.md`):
 
@@ -78,6 +85,7 @@ Then, for **each** command, a spec block (template below - repeat it for every c
 | `--export-dir <dir>` | `exportDir` | string | `exports` | `EXPORT_DIR` |
 | `--log-level <lvl>` | `logLevel` | pino level | `info` | `LOG_LEVEL` |
 | `--no-progress` | - (UI toggle, not in the cascade) | boolean | progress auto-on a TTY | - |
+| `--yes` *(guided assistant only)* | - (UI toggle, not in the cascade) | boolean | off | - |
 | `--target-org <alias>` | `targetOrg` | string | `sf` default org | `SF_TARGET_ORG` |
 | `--api-version <v>` | `apiVersion` | string | `sf` default | `SF_API_VERSION` |
 | `--page-size <n>` | `pageSize` | positive int | `2000` | `SF_PAGE_SIZE` |
@@ -88,6 +96,7 @@ The four `sf` rows (`--target-org`, `--api-version`, `--page-size`, `--sf-cli-pa
 - A global flag or config key that points to the project's **own storage** (a data file, a config file chosen by the user, e.g. `--data-file`) is resolved with `path.resolve`, not confined under `exportDir`. State it in the spec as a **documented deviation** (reason: user-chosen storage path); paths *written* as exports (`-o`) stay confined (`@rules/security.md` section 3).
 - `--help` / `--version` are **auto-provided** by commander - never re-specified. `--version` reads `APP_VERSION` from `config.ts`.
 - `--no-progress` disables the live progress display (steps/spinner on `stderr`); the display is auto-on when `stderr` is a TTY and off when piped / `CI` / debug logging - a runtime UI toggle, not a config-cascade key (`@rules/progress.md`).
+- `--yes` (only with the guided assistant) skips every confirmation question; it never replaces a required value, which stays an error (exit `2`) when missing outside a terminal. Like `--no-progress`, it is a runtime toggle, not a config-cascade key (`@rules/cli.md`).
 
 **Output convention** (`@rules/output.md`, `@rules/cli.md`) - the same across every command:
 - `-f, --format <fmt>` picks the `output/` formatter among the shipped ones (`table`, `json`, plus `csv` / `xlsx` only if selected in Phase 1); an unknown format is a usage error (exit `2`); the per-command default is confirmed in §2.
@@ -194,7 +203,13 @@ Grouped confirmations (first call, ≤ 4 questions), by use case:
   1. **Command grouping** - keep the proposed tree (`org`, `data`, `<group>` ...)? `Keep as proposed (recommended)` · `Adjust` (**Other** → free-form rename/regroup).
   2. **Tool-wide default output format** (the fallback for a command that sets none): `table` (recommended - human-readable) · `json` · `csv` (only if CSV was selected in Phase 1).
   3. **Default destination for an export-style command**: `stdout` (recommended for a query) · a file under `exportDir` (recommended for an export / bulk command).
-  4. **[Only if interactivity was enabled in Phase 1]** which destructive command(s) prompt for confirmation (always guarded - non-TTY / `--yes` → safe default): the enumerated destructive commands. If interactivity is off, skip this - every command is fully flag-driven.
+
+  Assistant calls (next call, **only if the guided assistant was enabled in Phase 1**; with `Flags only`, skip them: every command is fully flag-driven):
+
+  4. **Commands with an assistant** (`multiSelect` over the v1.0 commands; the flows marked in Phase 2 are the recommended ones).
+  5. **Destructive commands that confirm first** (always guarded: no terminal or `--yes` skips the question): the enumerated destructive commands among those.
+
+  The questions of each assistant (the table of the spec block) are proposed by the skill from the command's inputs and adjusted at the synthesis validation, free-form; only closed choices inside them (a `select`, a `confirm` default) use `AskUserQuestion` if the user asks to change them.
 - **Library**
   1. **Export grouping** - keep the proposed export list? `Keep as proposed (recommended)` · `Adjust` (**Other**).
   2. **Error style** of the public API: `Result<T>` return (recommended, `@rules/errors.md`) · named errors raised.
@@ -217,7 +232,7 @@ Renames and wording beyond the enumerable choices are handled free-form at the s
 ## 3. Synthesis
 
 Produce the complete synthesis of the validated interface (in the user's language), per use case:
-- **CLI tool**: the command tree, each command's spec block (positional args, per-command flags, input source, output format + destination, exit conditions, interactive prompt), the global flags table, the `--format`/`--output` convention, and, in `sfdx-project` mode, the `deploy` / `retrieve` surface.
+- **CLI tool**: the command tree, each command's spec block (positional args, per-command flags, input source, output format + destination, exit conditions, execution modes with each assistant's question table and each flow's steps and flags), the global flags table, the `--format`/`--output` convention, and, in `sfdx-project` mode, the `deploy` / `retrieve` surface.
 - **Library**: the export list and each export's spec block (signature, types, errors, side effects, stability).
 - **Service**: the route table and each endpoint's spec block (request, response, errors, auth, service called) + cross-cutting.
 - **Extension**: activation, commands, settings, views, events.

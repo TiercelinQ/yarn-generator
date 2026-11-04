@@ -12,9 +12,9 @@ Unified edition: the full generation pipeline **plus** post-delivery maintenance
 
 A structured prompt system that generates complete, production-ready TypeScript projects through a 5-phase cycle, then maintains them:
 
-1. **Scoping** - destination folder, project parameters, **use case** (CLI tool, library, service, extension, application; for an extension, the **host** is asked too, VS Code recommended), **Salesforce context** (detected from your objective: confirmed, absent, or asked when ambiguous), for an extension, whether it has a **webview**, output formats and runtime interactivity (CLI only), UI choices (application and webview), tests, and **distribution** (personal use or external publication; a library always ships to the npm registry and is not asked). Each option comes with a plain-language consequence. Execution shape and config strategy are stated framework defaults (overridable on request), not questions. A provisional calibration (size and number of batches) is announced at the end of Phase 1 and confirmed in Phase 2.
-2. **Featuring** - feature elicitation (commands for a CLI), MoSCoW prioritization, locked sizing.
-3. **Surfaces** - map each validated feature onto the interface of the use case: CLI commands (positional args, flags, input source, output format + destination, exit codes), public API of a library, endpoints of a service, contributions of an extension, screens of an application.
+1. **Scoping** - destination folder, project parameters, **use case** (CLI tool, library, service, extension, application; for an extension, the **host** is asked too, VS Code recommended), **Salesforce context** (detected from your objective: confirmed, absent, or asked when ambiguous), for an extension, whether it has a **webview**, output formats and execution modes (CLI only: flags only, or flags + guided assistant), UI choices (application and webview), tests, and **distribution** (personal use or external publication; a library always ships to the npm registry and is not asked). Each option comes with a plain-language consequence. Execution shape and config strategy are stated framework defaults (overridable on request), not questions. A provisional calibration (size and number of batches) is announced at the end of Phase 1 and confirmed in Phase 2.
+2. **Featuring** - feature elicitation (commands for a CLI), MoSCoW prioritization, execution flows (multi-step commands, CLI with the guided assistant only), locked sizing.
+3. **Surfaces** - map each validated feature onto the interface of the use case: CLI commands (positional args, flags, input source, output format + destination, exit codes, and with the guided assistant the question table of each command and the `--only` / `--skip` / `--dry-run` flags of each flow), public API of a library, endpoints of a service, contributions of an extension, screens of an application.
 4. **Architecture** - full file tree for the use case (and the Salesforce layer when confirmed), `Result<T>` + named errors, config keys - locked before any code is written.
 5. **Development** - auto-chained batch delivery, executable verification (install, typecheck, lint, build, smoke).
 
@@ -59,6 +59,7 @@ Common core for all five: `src/`, `test/` mirroring `src/`, shared files `config
 | Secrets          | Never in a file (with Salesforce: held by the `sf` OS keychain)                                        |
 | Logging          | `pino` (file + stderr, `pino-pretty` in dev) for CLI and service                                       |
 | Runtime feedback | Hand-rolled progress reporter - steps/spinner on stderr (bar only for a known total), auto-TTY, `--no-progress` - CLI only |
+| Execution modes  | Flags (always) · guided assistant with `@clack/prompts` (opt-in): no argument in a terminal starts the questions - CLI only |
 | Output           | Formatters - JSON · console table always; CSV (`csv-stringify`) · xlsx (`exceljs`) only if selected in Phase 1 - CLI only |
 | Error contract   | `Result<T>` + named errors + exit-code mapping (0/1/2) at the CLI boundary                             |
 | Build            | `tsup` (Node bundle, shebang for a CLI) · `tsx` (dev) · `tsc --noEmit` · Vite for the browser UI       |
@@ -172,7 +173,7 @@ A CLI is headless, so instead of a visual design system it enforces a **CLI cont
 - **`stderr` carries logs and human messages** - `pino` writes there and to a log file (`~/.<tool>/logs/app.log`, since a CLI runs from any folder); `stdout` is never a log destination.
 - **Exit codes**: `0` success · `1` runtime error · `2` usage/validation error - mapped once at the `cli.ts` boundary, never scattered.
 - **`Result<T>`** flows up from `services`/`sf`/`output`; the command reads `result.ok`; the boundary maps a failure to an exit code.
-- **Non-interactive by default** (cron / Windows Task Scheduler friendly); interactive prompts (`@clack/prompts`) are opt-in and guarded against a non-TTY run.
+- **Flags are the contract** (cron / Windows Task Scheduler friendly). A **guided assistant** (`@clack/prompts`) is opt-in in Phase 1: with no argument in a terminal the tool asks the questions and runs one or several commands; with some flags given it asks only the missing values; outside a terminal it never asks (no argument is a usage error, exit `2`). Prompts go to `stderr`, every question has an equivalent flag, and the equivalent command line is printed at the end.
 - **Runtime progress** on `stderr` (steps/spinner, bar only when a total is known) shows the operations a command performs - auto-on a TTY, silent when piped / cron / CI, `--no-progress` to disable; `stdout` stays clean.
 
 Library, service, extension, and application projects follow the contract of their own use case (`rules/use-cases.md`); projects with UI follow `rules/ui.md`.

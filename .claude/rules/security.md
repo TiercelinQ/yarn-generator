@@ -46,6 +46,7 @@ spawn(`sf data query --query "${soql}"`, { shell: true });
 - Validate with dedicated **TS type guards** (shape, required fields, bounds, enum membership). A schema library (`zod`...) is used **only if validated in Phase 1** - otherwise hand-written guards.
 - Salesforce only: the **`sf --json` envelope is parsed defensively**: field names drift across `sf` versions; read `status` / `result`, guard missing fields, never assume an exact shape (`@rules/sf-cli.md`).
 - Numeric/enum **env values** (`SF_PAGE_SIZE`, `LOG_LEVEL`) are parsed and validated in `resolveConfig()` (`@rules/config.md`), never trusted raw.
+- **Answers typed in the CLI guided assistant are external data too**: an answer is `unknown`, then validated with the same validators as the matching flag (a path answer goes through `resolveWithin`, §3). The assistant never asks for a token or a password: secrets never pass through a prompt (§4).
 - **No `any` on external data** - `unknown` then narrow. An `any` that lets an unvalidated field flow into logic is a defect.
 
 ## 3. File paths - resolve and confine

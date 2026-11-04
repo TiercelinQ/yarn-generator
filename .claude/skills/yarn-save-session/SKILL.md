@@ -43,6 +43,7 @@ Next batch: [X+1/total] (if Phase 5)
 - Target: Node.js 24+ · ESM · TypeScript strict · Yarn Berry 4.x [· commander (CLI tool) | · Vite + React (UI)]
 - Salesforce coupling: [none | confirmed - standalone | confirmed - sfdx-project] (decided in Phase 1)
 - Output formats: [the shipped formats: json · table, plus csv · xlsx if shipped] (CLI tool only, omit otherwise)
+- Execution modes: [Flags only | Flags + guided assistant (flows: [list or none])] (CLI tool only, omit otherwise)
 - Execution shape: [commands only | + standalone scripts] (CLI tool only, omit otherwise)
 - UI choices: [styling approach · UI libraries] (application and extension webview only, omit otherwise)
 - Tests: [Yes (Vitest) / No]

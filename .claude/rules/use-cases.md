@@ -76,6 +76,7 @@ src/
 ├── config.ts · logger.ts · progress.ts · types.ts · errors.ts
 ├── commands/              # thin adapters: parse flags -> one service -> format
 ├── services/              # business logic, returns Result<T>
+├── prompts/               # guided assistant only (Execution modes = Flags + guided assistant)
 ├── output/                # json · table always; csv · xlsx only when selected in Phase 1
 └── sf/                    # Salesforce coupling only
 ```
@@ -94,6 +95,9 @@ src/
 - `yarn node` starts Node with the same version as Yarn; arguments go to Node (`yarn-node.md`).
 - Add a dependency with `yarn add <package>` (runtime) or `yarn add -D <package>` (dev). Only libraries validated in Phase 1.
 
+### Execution modes
+- Fixed in Phase 1: `Flags only` (one command with its arguments, or several lines in succession; nothing is ever asked) or `Flags + guided assistant` (the same flags, plus: no argument in a terminal starts a series of questions that runs one or several commands for the user). The assistant lives in `src/prompts/` behind one `canPrompt()` guard, writes to `stderr`, and never runs outside a terminal. A flow is one command calling one flow service. Rules: `@rules/cli.md`.
+
 ### Errors and logging
 - Services return `Result<T>` or raise a named error. `cli.ts` maps the outcome to the exit code: `0` success, `1` runtime error, `2` usage or validation error (`@rules/cli.md`, `@rules/errors.md`).
 - `stdout` carries data only. Logs and human messages go to `stderr` through `src/logger.ts` (pino). A progress reporter shows long operations on `stderr` (`@rules/progress.md`).
@@ -110,6 +114,7 @@ Personal by default: run locally with `yarn dev` or `node dist/cli.js` (after `y
 - Writing a log line or a progress message to `stdout`: it corrupts the data a pipe reads.
 - Calling `process.exit` from a command or a service: the process dies before logs flush and tests cannot assert. Set `process.exitCode` or raise a named error.
 - Forgetting the shebang: the bundled `dist/cli.js` then is not executable as a bin.
+- Asking a question without going through `canPrompt()` (or on `stdout`): a scheduled or piped run hangs or its data is corrupted.
 - Changing an exit code, a flag name, or the `stdout` shape without a MAJOR version: scripts depend on them (`@rules/versioning.md`).
 
 ---

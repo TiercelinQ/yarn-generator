@@ -21,7 +21,7 @@ Produce a prioritized feature list, set the v1.0 perimeter, confirm the calibrat
 
 **Phase banner (show first)** - before anything else, output the phase banner as plain Markdown in the user's language, **never inside a code block or fenced block**. Three blocks, each on its own line: (1) H2 heading: Phase 2/5 - Features; (2) progress line: Scoping ✓ · ▶ Features · Surfaces · Architecture · Development; (3) intent in italics: Elicit features, prioritize (MoSCoW), and bound the v1.0 scope. See `## PIPELINE` in `CLAUDE.md`.
 
-Read `docs/specs/01-scoping.md` first (objective + locked parameters: use case, Salesforce context and coupling mode if any, use-case-specific parameters, tests, execution shape, distribution, config). Work in the user's language. Each closed/enumerable choice uses `AskUserQuestion`; open input (feature ideas, custom name) stays free-form text.
+Read `docs/specs/01-scoping.md` first (objective + locked parameters: use case, Salesforce context and coupling mode if any, use-case-specific parameters (for a CLI tool: output formats and execution modes), tests, execution shape, distribution, config). Work in the user's language. Each closed/enumerable choice uses `AskUserQuestion`; open input (feature ideas, custom name) stays free-form text.
 
 ### Step 1 - Confirm the project name (and the `bin` for a CLI tool)
 
@@ -54,6 +54,19 @@ Propose a reasoned classification of every candidate feature into **Must / Shoul
 
 Default derivation: **Must + Should = included in v1.0**; **Could + Won't = excluded**. Present the included/excluded split and ask the user to confirm or move individual features either way.
 
+### Step 4b - Execution flows (CLI tool only, and only if Execution modes = `Flags + guided assistant`)
+
+> Skip this step for any other use case, and when Phase 1 chose `Flags only`: every command is an independent command line.
+
+A **flow** is a command that chains several steps in one run (collect the inputs, check, dry run, apply, repeat). Derive the candidates from the validated v1.0 commands and from the objective only; never add a flow the objective does not support.
+
+1. `AskUserQuestion` (multiSelect): "Which v1.0 commands are multi-step flows?" Options: the v1.0 commands the objective suggests as multi-step (recommended marked), plus `None, every command is independent`. Split into several calls or use **Other** beyond 4 options.
+2. For each flow selected, state the proposed **ordered steps** in one line (derived from the objective) and ask for adjustments as free-form text (the steps are not enumerable). Then one grouped `AskUserQuestion` call per flow (≤ 4 questions):
+   - **Step selection**: `Run all or pick some steps (recommended)` - Phase 3 adds `--only` / `--skip` and a first assistant question "everything, or choose the steps" · `Always all steps`.
+   - **Repeat**: `Offer to repeat on another item` · `Single pass`. Recommend from the objective (the same action applied to several items).
+   - **Dry run**: `Dry run before the real run` · `No dry run`. Recommend `Dry run` only if the objective involves an effect that is hard to undo.
+3. A flow is **one command** that calls **one flow service**; the steps are the services it composes (`@rules/architecture.md`). A command that is not a flow stays one command, one service.
+
 ### Step 5 - Synthesis sheet
 
 Produce the sheet (in the user's language):
@@ -82,12 +95,19 @@ Produce the sheet (in the user's language):
 - Deferred - Could (possible in a later version): [list]
 - Dropped - Won't (out of scope, deliberate): [list]
 
+**Execution flows** (CLI tool only, and only if the guided assistant is enabled; otherwise write `Not applicable (Flags only)`, or omit the block for another use case)
+| Flow command | Ordered steps | Step selection | Repeat | Dry run |
+| ------------ | ------------- | -------------- | ------ | ------- |
+| ...          | ...           | [all or some / always all] | [Yes / No] | [Yes / No] |
+
+Write `None` when the assistant is enabled but no command is a flow.
+
 **Technical constraints**
 - Runtime: Node 24+ · TypeScript strict · ESM · Yarn Berry 4.x · `tsup`/`tsx` (+ `commander` · `pino` for a CLI tool, `pino` for a service, Vite + React for an application / extension webview)
 - Salesforce: [none | standalone | sfdx-project] (+ SFDX project path if sfdx-project) - `sf` v2 only when confirmed
 - Output formats: [Phase 1 selection = the formats that ship, `json` + `table` always] (default `--format`: [value]) - CLI tool only
 - Tests: [Yes/No] - `vitest`
-- Interactivity: [Non-interactive | Interactive] - `@clack/prompts` if interactive - CLI tool only
+- Execution modes: [Flags only | Flags + guided assistant] - `@clack/prompts` if the assistant is enabled - CLI tool only
 - Extension webview: [Yes | No] (Phase 1) - extension only
 - UI choices: [Phase 1 selection: styling approach, UI libraries] - application / extension webview only
 - Execution shape: [Phase 1]
@@ -98,7 +118,7 @@ Produce the sheet (in the user's language):
 **Calibration (confirmed here, from the v1.0 feature count)**
 - v1.0 features counted: [N] · size: [Small | Medium / Large] · batches: [N] (incl. 1 test batch if enabled)
 
-Apply the CALIBRATION table in `CLAUDE.md` (canonical source). **The calibration is confirmed here, from the v1.0 feature count, and locked upon validation** (it refines the provisional announcement of Phase 1). Count only the included v1.0 features (deferred/dropped excluded); when Salesforce is confirmed, the starter baseline features (the `org` group + `data` command, and the `deploy`/`retrieve` group in `sfdx-project` mode) are part of the scaffold, so count them. Record it in the spec - it fixes the Phase 5 batch split.
+Apply the CALIBRATION table in `CLAUDE.md` (canonical source). **The calibration is confirmed here, from the v1.0 feature count, and locked upon validation** (it refines the provisional announcement of Phase 1). Count only the included v1.0 features (deferred/dropped excluded); when Salesforce is confirmed, the starter baseline features (the `org` group + `data` command, and the `deploy`/`retrieve` group in `sfdx-project` mode) are part of the scaffold, so count them. Record it in the spec - it fixes the Phase 5 batch split. For a CLI tool with the guided assistant enabled, the `src/prompts/` files and each flow service are part of the file count (they ship with the commands batch, no dedicated batch).
 
 End with:
 

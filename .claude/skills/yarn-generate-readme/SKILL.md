@@ -26,7 +26,7 @@ Use the native Claude Code tools (no shell - Windows-compatible):
    - Read `package.json` (scripts, `bin`, `exports`, `engines`, `packageManager`) and `.yarnrc.yml`.
    - Detect the **use case** from `docs/specs/01-scoping.md`, confirmed by the entry point: `src/cli.ts` (CLI tool), `src/index.ts` (library), `src/server.ts` (service), `src/extension.ts` (extension), `src/main.tsx` (application).
    - Read the entry point and the layers above it for that use case:
-     - CLI tool: `src/cli.ts` (registered commands + exit-code mapping), `src/commands/` (subcommands, args/flags), `src/output/` (wired formats).
+     - CLI tool: `src/cli.ts` (registered commands + exit-code mapping), `src/commands/` (subcommands, args/flags), `src/output/` (wired formats), `src/prompts/` (if present: the guided assistant, one question table per command group, and the flow services in `src/services/`).
      - Library: `src/index.ts` (public API: exports, signatures, types).
      - Service: `src/server.ts` (endpoints, port and host config), `src/routes/` or the equivalent adapter layer from `04-architect.md`.
      - Extension: `src/extension.ts` (activation, contributions), the manifest fields of `package.json`.
@@ -61,7 +61,7 @@ Use the native Claude Code tools (no shell - Windows-compatible):
 - Runtime dependencies: [inferred from package.json]
 
 ## File tree
-[Actual src/ tree with the role of each file - entry point of the use case · services/ · shared config/logger/types/errors · plus the layers the use case adds (commands/, output/, sf/, UI folders...)]
+[Actual src/ tree with the role of each file - entry point of the use case · services/ · shared config/logger/types/errors · plus the layers the use case adds (commands/, prompts/ if present, output/, sf/, UI folders...)]
 
 ## Configuration
 [Config keys resolved through the cascade defaults < .env < CLI flags (flags: CLI tool only): the .env variables (.env.example) and, for a CLI tool, the flags that override them. Non-secret only - with Salesforce, secrets stay in the sf OS keychain.]
@@ -73,6 +73,10 @@ The `sf` v2 CLI is **required**. Install it and make it reachable: on the PATH, 
 ## Output formats
 [Section present ONLY for the CLI tool.]
 Emitted formats: [the formats shipped in src/output/: json · table always, csv · xlsx only if shipped]. xlsx (when shipped) is written to a file only. stdout carries data (pipeable); stderr carries logs and human messages.
+
+## Execution modes
+[Section present ONLY for the CLI tool.]
+[Flags mode: one command with its arguments, or several command lines one after the other (scripts, cron, CI). Only if `src/prompts/` exists, add the guided assistant: run the tool with no argument in a terminal, or a command with some values missing, and answer the questions; `--yes` skips the confirmations; each flow also takes `--only` / `--skip` (and `--dry-run` when it has a dry-run step); the assistant prints the equivalent command line at the end. Outside a terminal no question is ever asked and a missing required value exits with code 2. Inferred from src/prompts/ + src/commands/.]
 
 ## Install & run
 yarn install
@@ -97,7 +101,7 @@ yarn preview                  # personal use: serve the built dist/ locally
 
 Dependency audit (advisory, any use case): `yarn npm audit --recursive` (non-zero exit when advisories exist).
 
-[CLI tool only] Scheduling (unattended runs): Windows Task Scheduler or cron - invoke `node dist/cli.js <command>` with the required flags; data on stdout, logs on stderr.
+[CLI tool only] Scheduling (unattended runs): Windows Task Scheduler or cron - invoke `node dist/cli.js <command>` with the required flags (the guided assistant never runs outside a terminal); data on stdout, logs on stderr.
 
 ## Tests
 [Section included only if test/ detected]
