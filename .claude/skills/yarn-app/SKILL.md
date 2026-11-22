@@ -2,6 +2,7 @@
 name: yarn-app
 description: Start menu of the yarn TypeScript project generator (CLI tool, library, service, extension, application; Yarn Berry; optional Salesforce) - new project, resume an existing session, load a delivered project, or maintain one. Invoke at the beginning of a conversation or at any time via /yarn-app.
 model: haiku
+effort: low
 ---
 
 # /yarn-app - Start / resume / maintenance menu

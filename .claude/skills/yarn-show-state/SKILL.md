@@ -2,6 +2,7 @@
 name: yarn-show-state
 description: Show the current state of the yarn TypeScript generation project (CLI tool, library, service, extension, application) - phase, batch, next action, locked decisions, open points.
 model: haiku
+effort: low
 ---
 
 # /yarn-show-state - Current state

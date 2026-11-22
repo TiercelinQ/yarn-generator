@@ -2,6 +2,7 @@
 name: yarn-show-contract
 description: Show the complete validated architectural contract (Phase 4) of a yarn TypeScript project (CLI tool, library, service, extension, application; optional Salesforce) - the file tree with each file's role and the registry (entry → service → (sf) → output, depending on the use case). Reads docs/specs/04-architect.md.
 model: haiku
+effort: low
 ---
 
 # /yarn-show-contract - Validated architectural contract

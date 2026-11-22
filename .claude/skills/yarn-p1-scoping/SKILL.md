@@ -1,7 +1,8 @@
 ---
 name: yarn-p1-scoping
 description: Phase 1 of the yarn TypeScript generation cycle (Yarn Berry, Node.js) - scoping with use-case selection (CLI tool, library, service, extension, application), 3-case Salesforce detection (clear, absent, ambiguous), a few user-facing questions that depend on the use case, stated framework defaults (overridable on request), calibration announcement (number of batches), and writing of the scoping spec.
-model: sonnet
+model: opus
+effort: high
 ---
 
 # /yarn-p1-scoping - Scoping

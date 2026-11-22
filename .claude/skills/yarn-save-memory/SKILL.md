@@ -2,6 +2,7 @@
 name: yarn-save-memory
 description: Memorize an error not to repeat, a structural decision, or a generation preference for a yarn TypeScript project (Yarn Berry) - persisted into Claude Code native memory (project memory folder + MEMORY.md index), available in later sessions.
 model: haiku
+effort: low
 ---
 
 # /yarn-save-memory - Memorization
