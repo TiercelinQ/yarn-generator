@@ -44,6 +44,7 @@ Project root to maintain? (folder path, e.g. C:\projects\my-project)
 - add a feature (command, API function, endpoint, contribution, screen, depending on the use case) → `/yarn-add-feature`
 - fix a bug → `/yarn-fix-issue`
 - restructure existing code → `/yarn-refactor-code`
+- refresh the README → `/yarn-generate-readme`
 - cut a release / bump the version → `/yarn-release`
 - verify the build / run checks → `/yarn-run-tests`
 
