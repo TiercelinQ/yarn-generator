@@ -1,7 +1,8 @@
 ---
 name: yarn-p4-architect
 description: Phase 4 of the yarn TypeScript generation cycle (Yarn Berry, Node.js) - complete architectural contract tailored to the use case (CLI tool, library, service, extension, application) and to the optional Salesforce coupling (file tree + role of each file, entry-service-sf-output registry, Result<T> + named errors, config keys, coupling mode, source-to-test mapping), written to the contract spec and locked after validation.
-model: sonnet
+model: opus
+effort: high
 ---
 
 # /yarn-p4-architect - Architectural contract

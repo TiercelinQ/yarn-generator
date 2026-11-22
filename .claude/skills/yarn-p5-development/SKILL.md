@@ -2,6 +2,7 @@
 name: yarn-p5-development
 description: Phase 5 of the yarn TypeScript generation cycle (Yarn Berry, Node.js) - development and batch delivery of a CLI tool, library, service, extension or application (optional Salesforce coupling), files written directly to disk, executable verification with yarn (install/typecheck/lint/build/smoke), final README + CLAUDE.md + .claude/settings.json + Yarn Berry files.
 model: sonnet
+effort: medium
 ---
 
 # /yarn-p5-development - Batch development
@@ -107,7 +108,7 @@ Apply `@rules/verification.md` - both the executable commands (§A, blocking whe
 
   ## Origin
 
-  Framework: yarn v1.1.0
+  Framework: yarn v2.0.0
 
   ## Business context
 

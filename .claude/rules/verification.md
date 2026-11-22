@@ -1,6 +1,6 @@
 # Verification rules - single source of truth
 
-> Centralized, reusable verification for the whole framework. Referenced by `/yarn-p5-development`, `/yarn-add-feature`, `/yarn-fix-issue`, and `/yarn-run-tests` - never duplicated in those skills.
+> Centralized, reusable verification for the whole framework. Referenced by `/yarn-p5-development`, `/yarn-add-feature`, `/yarn-fix-issue`, `/yarn-refactor-code`, `/yarn-release`, `/yarn-load-project`, and `/yarn-run-tests` - never duplicated in those skills.
 > Two parts: **executable verification** (run real commands) and **static integrity** (read the code). Run silently; report only on a discrepancy.
 > Every `yarn` command below is verified against `yarn-berry-cli-reference/` (`yarn-install.md`, `yarn-run.md`). Never `npm`, `npx`, or `pnpm`.
 

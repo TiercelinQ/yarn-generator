@@ -1,7 +1,8 @@
 ---
 name: yarn-p2-featuring
 description: Phase 2 of the yarn TypeScript generation cycle (Yarn Berry, Node.js) - feature elicitation for the chosen use case (CLI tool, library, service, extension, application), MoSCoW prioritization, v1.0 scope, calibration confirmed here, blocking validation before Phase 3, written to the featuring spec.
-model: sonnet
+model: opus
+effort: medium
 ---
 
 # /yarn-p2-featuring - Requirements analysis

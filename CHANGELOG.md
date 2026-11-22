@@ -4,6 +4,21 @@ All notable changes to this generator are documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 (This is the changelog of the **generator** itself, distinct from the `docs/release/CHANGELOG.md` of each generated project.)
 
+## [2.0.0] - 2026-11-22
+
+### Added
+
+- `.claude/scripts/` with four dependency-free Node scripts: `bump-release.mjs` (runs `yarn version`), `run-verification.mjs` (smoke per use case), `static-checks.mjs` and `search-catalog.mjs` (both the `sf` and the Yarn catalogs). Tested on fixtures only, not on a generated project. The commands that could call them are unchanged.
+
+### Changed
+
+- **Major version.** Every skill now carries an `effort` field and a rebalanced `model` (`opus` for `p1-scoping`, `p2-featuring`, `p3-surfaces`, `p4-architect`, `fix-issue` and `refactor-code`, `haiku` for `release` and `run-tests`), which changes the cost profile of every command. Values come from the 2026-11-22 cost and quality audit and the Claude Code skill frontmatter documentation.
+- `rules/ui.md` now carries the minimum webview security for an extension (strict CSP with a per-load nonce, `asWebviewUri`, `localResourceRoots`, no inline handler, validated messages), because the `vscode` framework is not available in a generated project.
+- `yarn-show-state` names its sources (the latest `docs/sessions/SESSION_*_S*.md`, then `docs/release/CHANGELOG.md`) instead of risking an invented state.
+- `yarn-save-memory` asks the memory category with `AskUserQuestion` instead of a typed A-D choice.
+- `yarn-app` maintenance menu routes `/yarn-generate-readme`.
+- `rules/verification.md` lists the skills that load it (all 7 of them, not 4).
+
 ## [1.1.0] - 2026-11-04
 
 ### Added

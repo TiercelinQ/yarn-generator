@@ -2,6 +2,7 @@
 name: yarn-add-feature
 description: Add a feature (a command, endpoint, public export, extension contribution or screen, depending on the use case), a service, or an sf helper (only when Salesforce coupling is confirmed) to a TypeScript Yarn Berry project already delivered by this framework (CLI tool, library, service, extension or application). Use when the user asks to add or modify functionality on an existing project, respecting the locked architectural contract and the security rules.
 model: sonnet
+effort: high
 ---
 
 # /yarn-add-feature - Add a feature to a delivered project

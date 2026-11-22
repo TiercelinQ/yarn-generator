@@ -1,7 +1,8 @@
 ---
 name: yarn-p3-surfaces
 description: Phase 3 of the yarn TypeScript generation cycle (Yarn Berry, Node.js) - map each validated v1.0 feature onto the interface surface of the use case (CLI commands, library public API, service endpoints, extension contributions, application screens and flows), grouped confirmation, validated synthesis written to the interface spec before Phase 4.
-model: sonnet
+model: opus
+effort: high
 ---
 
 # /yarn-p3-surfaces - Surfaces (interface contract of the use case)

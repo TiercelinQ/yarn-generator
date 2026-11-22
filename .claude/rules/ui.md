@@ -297,7 +297,15 @@ it("affiche une alerte quand le chargement échoue", async () => {
 
 The webview is a React page that runs in an isolated context of the host. It reuses the same base as the application (this file), and talks to the host side of the extension only through **messages**.
 
-The webview transport API and the content security policy are host-specific: when host = VS Code, use the dedicated `vscode` generator framework for host-specific rules. This framework prescribes only the common rules below.
+The webview transport API is host-specific: when host = VS Code, use the dedicated `vscode` generator framework for the transport rules. The minimum webview security below belongs to this framework and applies in every generated project, because the `vscode` framework is not available there. Beyond it, this framework prescribes only the common rules below.
+
+Minimum webview security (host = VS Code):
+
+- **Strict CSP with a per-load nonce** in the webview HTML: `default-src 'none'`; `script-src 'nonce-<nonce>'`; `style-src ${webview.cspSource} 'unsafe-inline'`; `img-src ${webview.cspSource} data:`; `font-src ${webview.cspSource}`. No `'unsafe-eval'`, no remote origin.
+- `enableScripts: true` only when the UI needs scripts, with `localResourceRoots` limited to the webview build output (`dist/webview`) and `media/` when present.
+- Every local resource goes through `webview.asWebviewUri(...)`. No CDN, no remote font, script or style.
+- No inline event handler (`onclick=`): scripts run only with the nonce.
+- Every message received from the webview is parsed and validated on the host side before use (see the common rules below).
 
 > The VS Code examples here assume host = VS Code (chosen in Phase 1). Another host follows the same boundary with its own notification and log mechanism.
 

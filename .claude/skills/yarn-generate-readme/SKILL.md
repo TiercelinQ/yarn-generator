@@ -2,6 +2,7 @@
 name: yarn-generate-readme
 description: Analyze the specs and source of an existing yarn TypeScript project (CLI tool, library, service, extension, application; Yarn Berry; optional Salesforce) and generate its README.md (objective, interface of the use case, stack, tree, config keys, Salesforce prerequisite only if coupling is confirmed, install and run with yarn). Invoke from the target project root.
 model: sonnet
+effort: low
 ---
 
 # /yarn-generate-readme - Generate the README.md

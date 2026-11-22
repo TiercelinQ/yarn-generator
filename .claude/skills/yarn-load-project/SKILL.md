@@ -2,6 +2,7 @@
 name: yarn-load-project
 description: Load an existing yarn TypeScript project (CLI tool, library, service, extension, or application; Yarn Berry; Phase 5 complete) from its specs, README, and source - detect its use case and whether Salesforce coupling was confirmed, then bring the generator rules to bear on already-delivered code. Invoke from the target project root.
 model: sonnet
+effort: low
 ---
 
 # /yarn-load-project - Load an existing project

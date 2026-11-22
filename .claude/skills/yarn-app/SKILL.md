@@ -2,6 +2,7 @@
 name: yarn-app
 description: Start menu of the yarn TypeScript project generator (CLI tool, library, service, extension, application; Yarn Berry; optional Salesforce) - new project, resume an existing session, load a delivered project, or maintain one. Invoke at the beginning of a conversation or at any time via /yarn-app.
 model: haiku
+effort: low
 ---
 
 # /yarn-app - Start / resume / maintenance menu
@@ -44,6 +45,7 @@ Project root to maintain? (folder path, e.g. C:\projects\my-project)
 - add a feature (command, API function, endpoint, contribution, screen, depending on the use case) → `/yarn-add-feature`
 - fix a bug → `/yarn-fix-issue`
 - restructure existing code → `/yarn-refactor-code`
+- refresh the README → `/yarn-generate-readme`
 - cut a release / bump the version → `/yarn-release`
 - verify the build / run checks → `/yarn-run-tests`
 
