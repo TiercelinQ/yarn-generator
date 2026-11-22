@@ -108,7 +108,7 @@ Apply `@rules/verification.md` - both the executable commands (§A, blocking whe
 
   ## Origin
 
-  Framework: yarn v1.1.0
+  Framework: yarn v2.0.0
 
   ## Business context
 
